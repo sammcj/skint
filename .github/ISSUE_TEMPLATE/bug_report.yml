@@ -1,0 +1,50 @@
+name: Bug Report
+description: Report an issue with Skint
+title: "[Bug] "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thank you for reporting a bug. Please provide as much information as possible to help understand and reproduce the issue. If possible consider submitting a PR with a fix.
+
+  - type: textarea
+    id: bug-description
+    attributes:
+      label: Bug Description
+      description: Clear description of what the bug is
+      placeholder: Describe what happened...
+    validations:
+      required: true
+
+  - type: textarea
+    id: configuration
+    attributes:
+      label: Configuration
+      description: How is Skint configured? Include provider type, OS, and skint version.
+      placeholder: |
+        - skint version:
+        - OS:
+        - Provider type: (builtin / openrouter / local / custom)
+        - Config file (sanitised, no API keys):
+    validations:
+      required: true
+
+  - type: textarea
+    id: command
+    attributes:
+      label: Command run
+      description: The skint command that triggered the issue
+      placeholder: "skint use zai"
+    validations:
+      required: false
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs, Error Messages or Screenshots
+      description: Any relevant logs, error messages, screenshots or debugging output
+      placeholder:
+      render: text
+    validations:
+      required: false

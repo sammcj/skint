@@ -14,6 +14,7 @@ type Config struct {
 	OutputFormat    string      `yaml:"output_format" mapstructure:"output_format"`
 	ColorEnabled    bool        `yaml:"color_enabled" mapstructure:"color_enabled"`
 	NoBanner        bool        `yaml:"no_banner" mapstructure:"no_banner"`
+	ClaudeArgs      []string    `yaml:"claude_args,omitempty" mapstructure:"claude_args"`
 	Providers       []*Provider `yaml:"providers" mapstructure:"providers"`
 }
 
@@ -197,6 +198,16 @@ func (p *Provider) EffectiveModel() string {
 // Local providers and the native Anthropic provider do not need one.
 func (p *Provider) NeedsAPIKey() bool {
 	return p.Type != ProviderTypeLocal && p.Name != "native"
+}
+
+// IsConfigured returns true if this provider has been fully configured.
+// Checks APIKeyRef (persisted reference) rather than the runtime-resolved key,
+// so it works correctly for providers configured during the current session.
+func (p *Provider) IsConfigured() bool {
+	if !p.NeedsAPIKey() {
+		return true
+	}
+	return p.APIKeyRef != "" || p.resolvedAPIKey != ""
 }
 
 // NewDefaultConfig creates a new configuration with sensible defaults

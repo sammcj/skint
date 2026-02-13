@@ -24,6 +24,12 @@ func (m *Model) updateMainScreen(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 				m.done = true
 				return m, tea.Quit
 			}
+		case "u":
+			if !m.list.SettingFilter() {
+				m.resultAction = "launch"
+				m.done = true
+				return m, tea.Quit
+			}
 		case "o":
 			if !m.list.SettingFilter() {
 				m.screen = ScreenOpenRouter
@@ -75,32 +81,24 @@ func (m *Model) handleProviderSelect(item ProviderItem) (tea.Model, tea.Cmd) {
 	p := m.cfg.GetProvider(def.Name)
 
 	// Check if provider is already configured
-	isConfigured := item.configured || (p != nil && (!p.NeedsAPIKey() || p.GetAPIKey() != ""))
+	isConfigured := item.configured || (p != nil && p.IsConfigured())
 
-	// If already configured, use it (set as current and quit)
+	// If already configured, set as active and show confirmation
 	if isConfigured {
 		m.selectedProvider = def
-		m.message = fmt.Sprintf("✓ Using %s", def.DisplayName)
+		m.cfg.DefaultProvider = def.Name
+		m.message = fmt.Sprintf("✓ %s is now the active provider", def.DisplayName)
 		m.messageType = "success"
 		m.screen = ScreenSuccess
-		m.done = true
 		return m, nil
 	}
 
-	// Native provider needs no configuration
+	// Native provider needs no configuration -- just set as active
 	if def.Name == "native" {
-		if m.onProviderSelect != nil {
-			if err := m.onProviderSelect(def.Name); err != nil {
-				m.message = err.Error()
-				m.messageType = "error"
-				m.screen = ScreenError
-			} else {
-				m.message = fmt.Sprintf("✓ %s is ready to use", def.DisplayName)
-				m.messageType = "success"
-				m.screen = ScreenSuccess
-				m.done = true
-			}
-		}
+		m.cfg.DefaultProvider = def.Name
+		m.message = fmt.Sprintf("✓ %s is now the active provider", def.DisplayName)
+		m.messageType = "success"
+		m.screen = ScreenSuccess
 		return m, nil
 	}
 
@@ -111,9 +109,11 @@ func (m *Model) handleProviderSelect(item ProviderItem) (tea.Model, tea.Cmd) {
 		return m, nil
 	}
 
-	// Built-in providers need API key
+	// Built-in/OpenRouter providers need API key (and optionally model)
 	m.screen = ScreenAPIKeyInput
 	m.apiKeyInput = ""
+	m.hasExistingKey = false
+	m.modelInput = def.DefaultModel
 	m.inputError = ""
 	m.inputFocus = 0
 	return m, nil
@@ -123,8 +123,13 @@ func (m *Model) handleProviderEdit(item ProviderItem) (tea.Model, tea.Cmd) {
 	def := item.definition
 	p := m.cfg.GetProvider(def.Name)
 
+	// Native provider has no config to edit — just select it as active
+	if def.Name == "native" {
+		return m.handleProviderSelect(item)
+	}
+
 	// Check if provider is configured
-	isConfigured := item.configured || (p != nil && (!p.NeedsAPIKey() || p.GetAPIKey() != ""))
+	isConfigured := item.configured || (p != nil && p.IsConfigured())
 
 	if !isConfigured {
 		// Not configured yet - just configure it
@@ -160,9 +165,11 @@ func (m *Model) handleProviderEdit(item ProviderItem) (tea.Model, tea.Cmd) {
 		m.inputError = ""
 		m.screen = ScreenCustomProvider
 	default:
-		// Built-in providers - open API key input
+		// Built-in/OpenRouter providers - open API key + model input
 		m.screen = ScreenAPIKeyInput
 		m.apiKeyInput = ""
+		m.hasExistingKey = p.IsConfigured()
+		m.modelInput = p.EffectiveModel()
 		m.inputError = ""
 		m.inputFocus = 0
 	}
@@ -285,20 +292,51 @@ func (m *Model) updateAPIKeyInput(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case tea.KeyEsc:
 		m.screen = ScreenMain
 		m.apiKeyInput = ""
+		m.modelInput = ""
 		m.inputError = ""
 		return m, nil
 	case tea.KeyCtrlC:
 		m.done = true
 		return m, tea.Quit
+	case tea.KeyTab, tea.KeyDown:
+		m.inputFocus = (m.inputFocus + 1) % apiKeyFormFieldCount
+		return m, nil
+	case tea.KeyShiftTab, tea.KeyUp:
+		m.inputFocus = (m.inputFocus + apiKeyFormFieldCount - 1) % apiKeyFormFieldCount
+		return m, nil
 	case tea.KeyEnter:
-		if m.apiKeyInput == "" {
+		if m.apiKeyInput == "" && !m.hasExistingKey {
 			m.inputError = "API key is required"
+			m.inputFocus = 0
 			return m, nil
 		}
-		if len(m.apiKeyInput) < 8 {
+		if m.apiKeyInput != "" && len(m.apiKeyInput) < 8 {
 			m.inputError = "API key too short (minimum 8 characters)"
+			m.inputFocus = 0
 			return m, nil
 		}
+		// Model is required if provider has no default model or model mappings
+		modelRequired := m.selectedProvider.DefaultModel == "" && len(m.selectedProvider.ModelMappings) == 0
+		if modelRequired && m.modelInput == "" {
+			m.inputError = "Model name is required for this provider"
+			m.inputFocus = 1
+			return m, nil
+		}
+
+		// If editing existing provider and no new key provided, just update model
+		if m.apiKeyInput == "" && m.hasExistingKey {
+			existing := m.cfg.GetProvider(m.selectedProvider.Name)
+			if existing != nil && m.modelInput != "" {
+				existing.Model = m.modelInput
+			}
+			m.message = fmt.Sprintf("✓ %s updated successfully", m.selectedProvider.DisplayName)
+			m.messageType = "success"
+			m.screen = ScreenSuccess
+			m.apiKeyInput = ""
+			m.modelInput = ""
+			return m, nil
+		}
+
 		// Store API key
 		ref, err := m.secretsMgr.StoreWithReference(m.selectedProvider.Name, m.apiKeyInput)
 		if err != nil {
@@ -318,6 +356,11 @@ func (m *Model) updateAPIKeyInput(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			APIKeyRef:     ref,
 		}
 
+		// Set model if user provided one (e.g. for OpenRouter)
+		if m.modelInput != "" {
+			provider.Model = m.modelInput
+		}
+
 		m.cfg.RemoveProvider(provider.Name)
 		if err := m.cfg.AddProvider(provider); err != nil {
 			m.inputError = err.Error()
@@ -327,26 +370,37 @@ func (m *Model) updateAPIKeyInput(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.message = fmt.Sprintf("✓ %s configured successfully", m.selectedProvider.DisplayName)
 		m.messageType = "success"
 		m.screen = ScreenSuccess
-		m.done = true
 		m.apiKeyInput = ""
+		m.modelInput = ""
 		return m, nil
 	case tea.KeyBackspace:
-		if len(m.apiKeyInput) > 0 {
-			m.apiKeyInput = m.apiKeyInput[:len(m.apiKeyInput)-1]
-		}
 		m.inputError = ""
+		switch m.inputFocus {
+		case 0:
+			if len(m.apiKeyInput) > 0 {
+				m.apiKeyInput = m.apiKeyInput[:len(m.apiKeyInput)-1]
+			}
+		case 1:
+			if len(m.modelInput) > 0 {
+				m.modelInput = m.modelInput[:len(m.modelInput)-1]
+			}
+		}
 		return m, nil
 	}
 
-	// Handle rune input for API key
+	// Handle rune input
 	if msg.Type == tea.KeyRunes && len(msg.Runes) > 0 {
+		m.inputError = ""
 		for _, r := range msg.Runes {
-			// Only accept printable ASCII for API keys
 			if r >= 32 && r < 127 {
-				m.apiKeyInput += string(r)
+				switch m.inputFocus {
+				case 0:
+					m.apiKeyInput += string(r)
+				case 1:
+					m.modelInput += string(r)
+				}
 			}
 		}
-		m.inputError = ""
 	}
 
 	return m, nil

@@ -7,6 +7,7 @@ import (
 	"os"
 
 	"github.com/sammcj/skint/internal/config"
+	"github.com/sammcj/skint/internal/launcher"
 	"github.com/sammcj/skint/internal/providers"
 	"github.com/sammcj/skint/internal/secrets"
 	"github.com/sammcj/skint/internal/ui"
@@ -212,4 +213,42 @@ func (cc *CmdContext) RunMigration() error {
 	}
 
 	return nil
+}
+
+// LaunchClaude launches Claude Code with the specified provider's env vars.
+// If providerName is empty, launches claude without any provider overrides (native).
+// Uses cfg.ClaudeArgs as default arguments to the claude command.
+func (cc *CmdContext) LaunchClaude(providerName string) error {
+	if err := launcher.CheckClaude(); err != nil {
+		return err
+	}
+
+	args := append([]string{}, cc.Cfg.ClaudeArgs...)
+
+	if providerName == "" {
+		// Native: launch claude without provider env vars
+		l, err := launcher.New(cc.Cfg)
+		if err != nil {
+			return fmt.Errorf("failed to create launcher: %w", err)
+		}
+		return l.LaunchNative(args)
+	}
+
+	// Resolve provider and launch
+	p, err := cc.ResolveProvider(providerName)
+	if err != nil {
+		return err
+	}
+
+	provider, err := providers.FromConfig(p)
+	if err != nil {
+		return fmt.Errorf("failed to create provider %s: %w", providerName, err)
+	}
+
+	l, err := launcher.New(cc.Cfg)
+	if err != nil {
+		return fmt.Errorf("failed to create launcher: %w", err)
+	}
+
+	return l.Launch(provider, args)
 }

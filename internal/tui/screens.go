@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/charmbracelet/lipgloss"
 	"github.com/sammcj/skint/internal/config"
 )
 
@@ -15,19 +16,35 @@ func (m *Model) viewMainScreen() string {
 	b.WriteString(header)
 	b.WriteString("\n\n")
 
-	// Subtitle with legend
+	// Subtitle with active provider and legend
 	configuredCount := 0
-	for _, p := range m.cfg.Providers {
-		if !p.NeedsAPIKey() || p.GetAPIKey() != "" {
+	for _, pi := range m.providerList {
+		if pi.configured {
 			configuredCount++
 		}
 	}
-	subtitle := m.styles.Subtitle.Render(fmt.Sprintf("Configure Providers (%d configured)", configuredCount))
+
+	// Show active provider in header — default to Native Anthropic when no custom provider is set
+	activeDisplayName := "Native Anthropic"
+	if m.cfg.DefaultProvider != "" {
+		activeDisplayName = m.cfg.DefaultProvider
+		// Use the display name if we can find the provider
+		for _, pi := range m.providerList {
+			if pi.definition != nil && pi.definition.Name == m.cfg.DefaultProvider {
+				activeDisplayName = pi.definition.DisplayName
+				break
+			}
+		}
+	}
+	activeText := lipgloss.NewStyle().Foreground(lipgloss.Color("#FFFFFF")).Bold(true).
+		Render(activeDisplayName)
+	subtitle := m.styles.Subtitle.Render(fmt.Sprintf("Providers (%d configured)", configuredCount)) +
+		"  " + m.styles.Dimmed.Render("active: ") + activeText
 	b.WriteString(subtitle)
 	b.WriteString("\n")
 	legend := m.styles.Dimmed.Render(
 		m.styles.Success.Render("✓") + " configured  " +
-			m.styles.Info.Render("▶") + " active",
+			lipgloss.NewStyle().Foreground(lipgloss.Color("#FFFFFF")).Bold(true).Render("█") + " active",
 	)
 	b.WriteString(legend)
 	b.WriteString("\n")
@@ -37,7 +54,7 @@ func (m *Model) viewMainScreen() string {
 	b.WriteString("\n")
 
 	// Help
-	help := m.styles.Help.Render("↑/k ↓/j • enter: use • e: edit • a/c: add custom • t: test • q: quit")
+	help := m.styles.Help.Render("↑/k ↓/j • enter: select • e: edit • a/c: add custom • u: launch claude • t: test • q: quit")
 	b.WriteString(m.styles.Footer.Render(help))
 
 	return b.String()
@@ -184,18 +201,70 @@ func (m *Model) viewAPIKeyInput() string {
 	b.WriteString(info)
 	b.WriteString("\n\n")
 
-	// API Key input
-	b.WriteString(m.styles.Label.Render("API Key:"))
+	inputWidth := m.width - 20
+	if inputWidth < 30 {
+		inputWidth = 30
+	}
+
+	// API Key field
+	apiKeyLabel := m.styles.Label
+	if m.inputFocus == 0 {
+		apiKeyLabel = m.styles.InputPrompt
+	}
+	apiKeyRequired := !m.hasExistingKey
+	reqIndicator := ""
+	if apiKeyRequired {
+		reqIndicator = m.styles.Error.Render("*")
+	}
+	b.WriteString(apiKeyLabel.Render("API Key") + reqIndicator)
 	b.WriteString("\n")
 
-	// Show masked input
+	emptyPlaceholder := "Type your API key..."
+	if m.hasExistingKey {
+		emptyPlaceholder = "Key saved - leave blank to keep, or type to replace"
+	}
+
 	masked := strings.Repeat("•", len(m.apiKeyInput))
 	if masked == "" {
-		masked = m.styles.Dimmed.Render("Type your API key...")
+		masked = emptyPlaceholder
 	}
-	input := m.styles.Input.Width(m.width - 8).Render(masked)
-	b.WriteString(input)
+	if m.inputFocus == 0 {
+		b.WriteString(m.styles.Input.Width(inputWidth).Render(masked))
+	} else if m.apiKeyInput == "" {
+		b.WriteString(m.styles.Dimmed.Render("  " + emptyPlaceholder))
+	} else {
+		b.WriteString(m.styles.Value.Render("  " + masked))
+	}
+	b.WriteString("\n\n")
+
+	// Model field - required if provider has no default model or model mappings
+	modelRequired := m.selectedProvider.DefaultModel == "" && len(m.selectedProvider.ModelMappings) == 0
+	modelLabel := m.styles.Label
+	if m.inputFocus == 1 {
+		modelLabel = m.styles.InputPrompt
+	}
+	modelHint := "e.g., anthropic/claude-sonnet-4"
+	if m.selectedProvider.DefaultModel != "" {
+		modelHint = m.selectedProvider.DefaultModel
+	}
+	modelReqIndicator := ""
+	if modelRequired {
+		modelReqIndicator = m.styles.Error.Render("*")
+	}
+	b.WriteString(modelLabel.Render("Model") + modelReqIndicator)
 	b.WriteString("\n")
+	displayModel := m.modelInput
+	if displayModel == "" {
+		displayModel = modelHint
+	}
+	if m.inputFocus == 1 {
+		b.WriteString(m.styles.Input.Width(inputWidth).Render(displayModel))
+	} else if m.modelInput == "" {
+		b.WriteString(m.styles.Dimmed.Render("  " + displayModel))
+	} else {
+		b.WriteString(m.styles.Value.Render("  " + displayModel))
+	}
+	b.WriteString("\n\n")
 
 	// Error message
 	if m.inputError != "" {
@@ -203,10 +272,8 @@ func (m *Model) viewAPIKeyInput() string {
 		b.WriteString("\n")
 	}
 
-	b.WriteString("\n")
-
 	// Help
-	help := m.styles.Help.Render("type: enter key • enter: confirm • esc: cancel")
+	help := m.styles.Help.Render("↑/↓/tab: navigate • enter: save • esc: cancel")
 	b.WriteString(m.styles.Footer.Render(help))
 
 	return b.String()

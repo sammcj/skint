@@ -35,6 +35,9 @@ const customFormFieldCount = 6
 // localFormFieldCount is the number of fields in the local provider config form
 const localFormFieldCount = 3
 
+// apiKeyFormFieldCount is the number of fields in the API key form (API key + model)
+const apiKeyFormFieldCount = 2
+
 // Model is the main TUI model
 type Model struct {
 	// State
@@ -56,8 +59,10 @@ type Model struct {
 	// Form state
 	selectedProvider *providers.Definition
 	apiKeyInput      string
+	modelInput       string
 	inputFocus       int
 	inputError       string
+	hasExistingKey   bool
 
 	// Custom provider form fields
 	customProviderName     string
@@ -106,11 +111,7 @@ func (p ProviderItem) Title() string {
 	if p.configured {
 		status = "✓"
 	}
-	activeIndicator := " "
-	if p.active {
-		activeIndicator = "▶"
-	}
-	return fmt.Sprintf("%s %s %s", status, activeIndicator, p.definition.DisplayName)
+	return fmt.Sprintf("%s %s", status, p.definition.DisplayName)
 }
 
 func (p ProviderItem) Description() string {
@@ -136,11 +137,20 @@ func (d itemDelegate) Render(w io.Writer, m list.Model, index int, listItem list
 	}
 
 	var title, desc lipgloss.Style
+	isSelected := index == m.Index()
 
-	if index == m.Index() {
+	switch {
+	case item.active && isSelected:
+		// Active + selected: combine both indicators
+		title = d.styles.ListActive.Foreground(d.styles.PrimaryColor)
+		desc = d.styles.Dimmed.PaddingLeft(4)
+	case item.active:
+		title = d.styles.ListActive
+		desc = d.styles.Dimmed.PaddingLeft(4)
+	case isSelected:
 		title = d.styles.ListSelected
 		desc = d.styles.Dimmed.PaddingLeft(4)
-	} else {
+	default:
 		title = d.styles.ListItem.Foreground(d.styles.Normal.GetForeground())
 		desc = d.styles.Dimmed.PaddingLeft(4)
 	}
@@ -149,15 +159,10 @@ func (d itemDelegate) Render(w io.Writer, m list.Model, index int, listItem list
 	titleStr := item.Title()
 	if item.isAddNew {
 		titleStr = strings.Replace(titleStr, "+", d.styles.Info.Render("+"), 1)
+	} else if item.configured {
+		titleStr = strings.Replace(titleStr, "✓", d.styles.Success.Render("✓"), 1)
 	} else {
-		if item.configured {
-			titleStr = strings.Replace(titleStr, "✓", d.styles.Success.Render("✓"), 1)
-		} else {
-			titleStr = strings.Replace(titleStr, "○", d.styles.Dimmed.Render("○"), 1)
-		}
-		if item.active {
-			titleStr = strings.Replace(titleStr, "▶", d.styles.Info.Render("▶"), 1)
-		}
+		titleStr = strings.Replace(titleStr, "○", d.styles.Dimmed.Render("○"), 1)
 	}
 
 	fmt.Fprint(w, title.Render(titleStr)+"\n")
@@ -182,7 +187,7 @@ func NewModel(cfg *config.Config, secretsMgr *secrets.Manager) *Model {
 			item := ProviderItem{
 				definition: def,
 				configured: true,
-				active:     cfg.DefaultProvider == def.Name,
+				active:     cfg.DefaultProvider == def.Name || cfg.DefaultProvider == "",
 				category:   "Native",
 			}
 			items = append(items, item)
@@ -194,7 +199,7 @@ func NewModel(cfg *config.Config, secretsMgr *secrets.Manager) *Model {
 	if intl, ok := grouped["International"]; ok {
 		for _, def := range intl {
 			p := cfg.GetProvider(def.Name)
-			configured := p != nil && (!p.NeedsAPIKey() || p.GetAPIKey() != "")
+			configured := p != nil && p.IsConfigured()
 			item := ProviderItem{
 				definition: def,
 				configured: configured,
@@ -210,7 +215,7 @@ func NewModel(cfg *config.Config, secretsMgr *secrets.Manager) *Model {
 	if china, ok := grouped["China"]; ok {
 		for _, def := range china {
 			p := cfg.GetProvider(def.Name)
-			configured := p != nil && (!p.NeedsAPIKey() || p.GetAPIKey() != "")
+			configured := p != nil && p.IsConfigured()
 			item := ProviderItem{
 				definition: def,
 				configured: configured,
@@ -347,6 +352,125 @@ func (m *Model) SetOnConfigDone(fn func() error) {
 	m.onConfigDone = fn
 }
 
+// refreshProviderList rebuilds the list items from current config state
+func (m *Model) refreshProviderList() {
+	var items []list.Item
+	providerItems := []ProviderItem{}
+	grouped := m.registry.GroupedList()
+
+	// Native (always configured)
+	if native, ok := grouped["Native"]; ok {
+		for _, def := range native {
+			item := ProviderItem{
+				definition: def,
+				configured: true,
+				active:     m.cfg.DefaultProvider == def.Name || m.cfg.DefaultProvider == "",
+				category:   "Native",
+			}
+			items = append(items, item)
+			providerItems = append(providerItems, item)
+		}
+	}
+
+	// International
+	if intl, ok := grouped["International"]; ok {
+		for _, def := range intl {
+			p := m.cfg.GetProvider(def.Name)
+			configured := p != nil && p.IsConfigured()
+			item := ProviderItem{
+				definition: def,
+				configured: configured,
+				active:     m.cfg.DefaultProvider == def.Name,
+				category:   "International",
+			}
+			items = append(items, item)
+			providerItems = append(providerItems, item)
+		}
+	}
+
+	// China
+	if china, ok := grouped["China"]; ok {
+		for _, def := range china {
+			p := m.cfg.GetProvider(def.Name)
+			configured := p != nil && p.IsConfigured()
+			item := ProviderItem{
+				definition: def,
+				configured: configured,
+				active:     m.cfg.DefaultProvider == def.Name,
+				category:   "China",
+			}
+			items = append(items, item)
+			providerItems = append(providerItems, item)
+		}
+	}
+
+	// Local
+	if local, ok := grouped["Local"]; ok {
+		for _, def := range local {
+			p := m.cfg.GetProvider(def.Name)
+			configured := p != nil
+			item := ProviderItem{
+				definition: def,
+				configured: configured,
+				active:     m.cfg.DefaultProvider == def.Name,
+				category:   "Local",
+			}
+			items = append(items, item)
+			providerItems = append(providerItems, item)
+		}
+	}
+
+	// Custom providers
+	for _, p := range m.cfg.Providers {
+		if p.Type == config.ProviderTypeCustom {
+			def := &providers.Definition{
+				Name:        p.Name,
+				DisplayName: p.DisplayName,
+				Description: fmt.Sprintf("Custom %s endpoint", p.APIType),
+				Type:        p.Type,
+				BaseURL:     p.BaseURL,
+			}
+			item := ProviderItem{
+				definition: def,
+				configured: true,
+				active:     m.cfg.DefaultProvider == p.Name,
+				category:   "Custom",
+			}
+			items = append(items, item)
+			providerItems = append(providerItems, item)
+		}
+	}
+
+	// Sort
+	sort.Slice(items, func(i, j int) bool {
+		itemI := items[i].(ProviderItem)
+		itemJ := items[j].(ProviderItem)
+		if itemI.active != itemJ.active {
+			return itemI.active && !itemJ.active
+		}
+		if itemI.configured != itemJ.configured {
+			return itemI.configured && !itemJ.configured
+		}
+		categoryPriority := map[string]int{
+			"Custom": 0, "Native": 1, "International": 2, "China": 3, "Local": 4,
+		}
+		pi := categoryPriority[itemI.category]
+		pj := categoryPriority[itemJ.category]
+		if pi != pj {
+			return pi < pj
+		}
+		return itemI.definition.Name < itemJ.definition.Name
+	})
+
+	// Add "Add New Provider" at the end
+	addNewItem := ProviderItem{isAddNew: true}
+	items = append(items, addNewItem)
+	providerItems = append(providerItems, addNewItem)
+
+	m.list.SetItems(items)
+	m.providerList = providerItems
+}
+
 // Init initialises the model
 func (m *Model) Init() tea.Cmd {
 	return nil
@@ -386,10 +510,11 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case ScreenCustomProvider:
 			return m.updateCustomProvider(msg)
 		case ScreenSuccess, ScreenError:
-			// Any key returns to main screen
+			// Any key returns to main screen (or quits if done)
 			if m.screen == ScreenSuccess && m.done {
 				return m, tea.Quit
 			}
+			m.refreshProviderList()
 			m.screen = ScreenMain
 			return m, nil
 		}

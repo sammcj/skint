@@ -43,12 +43,16 @@ Skint is a CLI launcher that wraps Claude Code with different LLM provider confi
 - Output formats: `human`, `json`, `plain` - all commands should respect `outputFormat` global flag
 - Environment variable overrides use `SKINT_` prefix (e.g. `SKINT_DEFAULT_PROVIDER`, `SKINT_VERBOSE`)
 - Banner output goes to stderr, not stdout
-- Running with no subcommand launches the interactive TUI
+- Running with no subcommand launches the interactive TUI; pressing 'u' or quitting with a provider set will launch claude
+- `skint env` prints shell export statements for the active provider (for use with `eval "$(skint env)"` in shell profiles)
+- `config.ClaudeArgs` (YAML: `claude_args`) holds default arguments passed to claude on launch (e.g. `["--continue"]`)
+- `config.Provider.IsConfigured()` checks `APIKeyRef` (persisted) rather than `resolvedAPIKey` (runtime-only) - always prefer this over checking `GetAPIKey()`
 </CONVENTIONS>
 
 <GOTCHAS>
 - `launcher.go` uses `syscall.Exec` on Unix which replaces the process entirely - code after the exec call never runs
 - The `removeEnvVars` function in launcher parses env strings manually (splitting on first `=`) - entries without `=` are silently dropped
 - `config.Provider` has both `APIKey` (for migration only, stored in YAML) and `resolvedAPIKey` (unexported, loaded at runtime from keyring/file) - always use `GetAPIKey()`/`SetResolvedAPIKey()`, never read `APIKey` directly
-- No automated tests exist yet
+- No automated tests exist yet for TUI package
+- `LaunchNative` in launcher exec's claude without any env var overrides; `Launch` sets provider-specific env vars
 </GOTCHAS>

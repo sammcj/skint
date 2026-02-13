@@ -138,6 +138,18 @@ func (l *Launcher) exec(claudePath string, args []string, env []string) error {
 	return syscall.Exec(claudePath, append([]string{"claude"}, args...), env)
 }
 
+// LaunchNative launches Claude without any provider env var overrides.
+// Used when the active provider is "native" (direct Anthropic).
+func (l *Launcher) LaunchNative(args []string) error {
+	claudePath, err := exec.LookPath("claude")
+	if err != nil {
+		return fmt.Errorf("claude command not found. Please install Claude Code: https://claude.ai/install.sh")
+	}
+
+	env := os.Environ()
+	return l.exec(claudePath, args, env)
+}
+
 // CheckClaude verifies that Claude CLI is installed
 func CheckClaude() error {
 	_, err := exec.LookPath("claude")

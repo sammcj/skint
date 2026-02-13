@@ -17,6 +17,7 @@ func main() {
 	// Add subcommands
 	rootCmd.AddCommand(commands.NewConfigCmd())
 	rootCmd.AddCommand(commands.NewUseCmd())
+	rootCmd.AddCommand(commands.NewEnvCmd())
 	rootCmd.AddCommand(commands.NewExecCmd())
 	rootCmd.AddCommand(commands.NewListCmd())
 	rootCmd.AddCommand(commands.NewInfoCmd())

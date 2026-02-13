@@ -39,7 +39,7 @@ func runConfig(cmd *cobra.Command, args []string) error {
 	}
 
 	// Always use TUI
-	return tui.RunInteractive(cc.Cfg, cc.SecretsMgr, cc.SaveConfig)
+	return tui.RunInteractive(cc.Cfg, cc.SecretsMgr, cc.SaveConfig, cc.LaunchClaude)
 }
 
 func configureProviderWithTUI(cc *CmdContext, name string) error {

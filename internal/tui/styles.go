@@ -37,6 +37,7 @@ type Styles struct {
 	List         lipgloss.Style
 	ListItem     lipgloss.Style
 	ListSelected lipgloss.Style
+	ListActive   lipgloss.Style
 	Category     lipgloss.Style
 
 	// Box styles
@@ -123,7 +124,6 @@ func DefaultStyles() Styles {
 	s.Selected = lipgloss.NewStyle().
 		Bold(true).
 		Foreground(primary).
-		Background(lipgloss.Color("#EDE9FE")).
 		PaddingLeft(1).
 		PaddingRight(1)
 
@@ -179,9 +179,20 @@ func DefaultStyles() Styles {
 	s.ListSelected = lipgloss.NewStyle().
 		Foreground(primary).
 		Bold(true).
-		Background(lipgloss.Color("#EDE9FE")).
-		PaddingLeft(2).
-		PaddingRight(2)
+		PaddingLeft(1).
+		PaddingRight(2).
+		BorderLeft(true).
+		BorderStyle(lipgloss.ThickBorder()).
+		BorderForeground(primary)
+
+	s.ListActive = lipgloss.NewStyle().
+		Foreground(lipgloss.Color("#FFFFFF")).
+		Bold(true).
+		PaddingLeft(1).
+		PaddingRight(2).
+		BorderLeft(true).
+		BorderStyle(lipgloss.ThickBorder()).
+		BorderForeground(success)
 
 	s.Category = lipgloss.NewStyle().
 		Bold(true).

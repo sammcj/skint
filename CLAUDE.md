@@ -24,14 +24,15 @@ Skint is a CLI launcher that wraps Claude Code with different LLM provider confi
 **Key packages:**
 - `commands/` - Cobra command definitions. Global state (`configMgr`, `secretsMgr`, `cfg`) lives in `root.go` and is initialised via `PersistentPreRunE`. All subcommands register in `main.go`.
 - `config/` - YAML config loading/saving (XDG-compliant: `~/.config/skint/config.yaml`). `schema.go` defines `Config` and `Provider` structs. `config.go` has the `Manager`. `migrate.go` imports from the old bash version.
-- `providers/` - `Provider` interface with four implementations: `BuiltinProvider`, `OpenRouterProvider`, `LocalProvider`, `CustomProvider`. All embed `baseProvider`. Registry of 13 built-in providers defined as data.
+- `providers/` - `Provider` interface with four implementations: `BuiltinProvider`, `OpenRouterProvider`, `LocalProvider`, `CustomProvider`. All embed `baseProvider`. Registry of 10 built-in providers defined as data. `baseProvider.keyEnvVar` overrides the default env var name for the API key (used by the `anthropic` provider to set `ANTHROPIC_API_KEY` instead of `ANTHROPIC_AUTH_TOKEN`).
+- `models/` - Model fetching from provider APIs. Strategies: OpenAI-compatible (`/v1/models`), Ollama (`/api/tags`), OpenRouter (public listing). Used by the TUI model picker.
 - `launcher/` - Builds env vars from a `Provider`, strips conflicting ANTHROPIC_*/OPENAI_* vars from the current env, then uses `syscall.Exec` on Unix (process replacement for signal forwarding) or `exec.Command` on Windows.
 - `secrets/` - Two-tier credential storage: OS keyring (primary) with AES-256-GCM encrypted file fallback (`~/.local/share/skint/secrets.enc`). API key refs use format `keyring:<name>` or `file:<name>`.
-- `tui/` - Bubble Tea interactive UI. `model.go` is the main state machine (~1170 lines, candidate for splitting). Handles provider selection, API key input, custom provider config.
+- `tui/` - Bubble Tea interactive UI. `model.go` is the main state machine. `modelpicker.go` handles async model fetching and picker overlay state. Handles provider selection, API key input, custom provider config.
 - `ui/` - Simple non-interactive CLI components (colours, menus, prompts).
 
 **Provider -> Environment Variable mapping** is the core logic. Each provider type generates different env vars via `GetEnvVars()`:
-- Builtin: `ANTHROPIC_BASE_URL`, `ANTHROPIC_AUTH_TOKEN`, model tier mappings
+- Builtin: `ANTHROPIC_BASE_URL`, `ANTHROPIC_AUTH_TOKEN` (or `ANTHROPIC_API_KEY` via `keyEnvVar`), model tier mappings
 - OpenRouter: Same as builtin but routes through `openrouter.ai/api`, explicitly empties `ANTHROPIC_API_KEY`
 - Local: `ANTHROPIC_BASE_URL` with optional auth, no API key required
 - Custom: Either Anthropic-compatible or OpenAI-compatible (`OPENAI_BASE_URL`, `OPENAI_API_KEY`, `OPENAI_MODEL`)
@@ -47,6 +48,8 @@ Skint is a CLI launcher that wraps Claude Code with different LLM provider confi
 - `skint env` prints shell export statements for the active provider (for use with `eval "$(skint env)"` in shell profiles)
 - `config.ClaudeArgs` (YAML: `claude_args`) holds default arguments passed to claude on launch (e.g. `["--continue"]`)
 - `config.Provider.IsConfigured()` checks `APIKeyRef` (persisted) rather than `resolvedAPIKey` (runtime-only) - always prefer this over checking `GetAPIKey()`
+- Provider categories in TUI: Native (`native`, `anthropic`), International, Local. No China category.
+- The `anthropic` provider uses `KeyEnvVar: "ANTHROPIC_API_KEY"` and has no base URL (Claude Code defaults to api.anthropic.com)
 </CONVENTIONS>
 
 <GOTCHAS>

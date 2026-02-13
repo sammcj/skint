@@ -130,7 +130,7 @@ func (m *Migration) unescape(s string) string {
 var ProviderDefinitions = map[string]OldEntry{
 	"native": {
 		Name:        "native",
-		DisplayName: "Native Anthropic",
+		DisplayName: "Claude Subscription",
 		KeyVar:      "",
 		BaseURL:     "",
 		Model:       "",
@@ -143,26 +143,11 @@ var ProviderDefinitions = map[string]OldEntry{
 		Model:       "glm-5",
 		ModelOpts:   map[string]string{"haiku": "glm-5", "sonnet": "glm-5", "opus": "glm-5"},
 	},
-	"zai-cn": {
-		Name:        "zai-cn",
-		DisplayName: "Z.AI China",
-		KeyVar:      "ZAI_CN_API_KEY",
-		BaseURL:     "https://open.bigmodel.cn/api/anthropic",
-		Model:       "glm-5",
-		ModelOpts:   map[string]string{"haiku": "glm-5", "sonnet": "glm-5", "opus": "glm-5"},
-	},
 	"minimax": {
 		Name:        "minimax",
 		DisplayName: "MiniMax",
 		KeyVar:      "MINIMAX_API_KEY",
 		BaseURL:     "https://api.minimax.io/anthropic",
-		Model:       "MiniMax-M2.5",
-	},
-	"minimax-cn": {
-		Name:        "minimax-cn",
-		DisplayName: "MiniMax China",
-		KeyVar:      "MINIMAX_CN_API_KEY",
-		BaseURL:     "https://api.minimaxi.com/anthropic",
 		Model:       "MiniMax-M2.5",
 	},
 	"kimi": {
@@ -180,13 +165,6 @@ var ProviderDefinitions = map[string]OldEntry{
 		BaseURL:     "https://api.moonshot.ai/anthropic",
 		Model:       "kimi-k2.5",
 	},
-	"ve": {
-		Name:        "ve",
-		DisplayName: "VolcEngine",
-		KeyVar:      "ARK_API_KEY",
-		BaseURL:     "https://ark.cn-beijing.volces.com/api/coding",
-		Model:       "doubao-seed-code-preview-latest",
-	},
 	"deepseek": {
 		Name:        "deepseek",
 		DisplayName: "DeepSeek",
@@ -194,14 +172,6 @@ var ProviderDefinitions = map[string]OldEntry{
 		BaseURL:     "https://api.deepseek.com/anthropic",
 		Model:       "deepseek-chat",
 		ModelOpts:   map[string]string{"small": "deepseek-chat"},
-	},
-	"mimo": {
-		Name:        "mimo",
-		DisplayName: "Xiaomi MiMo",
-		KeyVar:      "MIMO_API_KEY",
-		BaseURL:     "https://api.xiaomimimo.com/anthropic",
-		Model:       "mimo-v2-flash",
-		ModelOpts:   map[string]string{"haiku": "mimo-v2-flash", "sonnet": "mimo-v2-flash", "opus": "mimo-v2-flash"},
 	},
 	"ollama": {
 		Name:        "ollama",

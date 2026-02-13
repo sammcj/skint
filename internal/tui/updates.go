@@ -106,7 +106,9 @@ func (m *Model) handleProviderSelect(item ProviderItem) (tea.Model, tea.Cmd) {
 	if def.Type == config.ProviderTypeLocal {
 		m.initLocalProviderForm(def)
 		m.screen = ScreenProviderConfig
-		return m, nil
+		m.resetModelPicker()
+		// Auto-fetch models for local providers (no auth needed for listing)
+		return m, m.triggerModelFetch()
 	}
 
 	// Built-in/OpenRouter providers need API key (and optionally model)
@@ -116,6 +118,7 @@ func (m *Model) handleProviderSelect(item ProviderItem) (tea.Model, tea.Cmd) {
 	m.modelInput = def.DefaultModel
 	m.inputError = ""
 	m.inputFocus = 0
+	m.resetModelPicker()
 	return m, nil
 }
 
@@ -140,6 +143,9 @@ func (m *Model) handleProviderEdit(item ProviderItem) (tea.Model, tea.Cmd) {
 	// Provider is configured - open appropriate edit screen
 	m.selectedProvider = def
 
+	m.resetModelPicker()
+	var cmd tea.Cmd
+
 	switch def.Type {
 	case config.ProviderTypeLocal:
 		// Local providers - show config form with existing values
@@ -149,6 +155,7 @@ func (m *Model) handleProviderEdit(item ProviderItem) (tea.Model, tea.Cmd) {
 		m.inputFocus = 0
 		m.inputError = ""
 		m.screen = ScreenProviderConfig
+		cmd = m.triggerModelFetch()
 	case config.ProviderTypeCustom:
 		// Custom providers - open custom provider form with existing values
 		m.customProviderName = p.Name
@@ -164,6 +171,7 @@ func (m *Model) handleProviderEdit(item ProviderItem) (tea.Model, tea.Cmd) {
 		m.inputFocus = 0
 		m.inputError = ""
 		m.screen = ScreenCustomProvider
+		cmd = m.triggerModelFetch()
 	default:
 		// Built-in/OpenRouter providers - open API key + model input
 		m.screen = ScreenAPIKeyInput
@@ -172,9 +180,13 @@ func (m *Model) handleProviderEdit(item ProviderItem) (tea.Model, tea.Cmd) {
 		m.modelInput = p.EffectiveModel()
 		m.inputError = ""
 		m.inputFocus = 0
+		// Auto-fetch if provider already has a key
+		if p.IsConfigured() {
+			cmd = m.triggerModelFetch()
+		}
 	}
 
-	return m, nil
+	return m, cmd
 }
 
 func (m *Model) initLocalProviderForm(def *providers.Definition) {
@@ -194,13 +206,23 @@ func (m *Model) initLocalProviderForm(def *providers.Definition) {
 }
 
 func (m *Model) updateProviderConfig(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	// Model picker intercepts input when open
+	if m.updateModelPicker(msg) {
+		return m, nil
+	}
+
 	switch msg.Type {
 	case tea.KeyEsc:
 		m.screen = ScreenMain
+		m.resetModelPicker()
 		return m, nil
 	case tea.KeyCtrlC:
 		m.done = true
 		return m, tea.Quit
+	case tea.KeyCtrlF:
+		if m.isOnModelField() {
+			return m, m.triggerModelFetch()
+		}
 	case tea.KeyTab, tea.KeyDown:
 		m.inputFocus = (m.inputFocus + 1) % localFormFieldCount
 		return m, nil
@@ -288,16 +310,26 @@ func (m *Model) submitLocalProvider() (tea.Model, tea.Cmd) {
 }
 
 func (m *Model) updateAPIKeyInput(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	// Model picker intercepts input when open
+	if m.updateModelPicker(msg) {
+		return m, nil
+	}
+
 	switch msg.Type {
 	case tea.KeyEsc:
 		m.screen = ScreenMain
 		m.apiKeyInput = ""
 		m.modelInput = ""
 		m.inputError = ""
+		m.resetModelPicker()
 		return m, nil
 	case tea.KeyCtrlC:
 		m.done = true
 		return m, tea.Quit
+	case tea.KeyCtrlF:
+		if m.isOnModelField() {
+			return m, m.triggerModelFetch()
+		}
 	case tea.KeyTab, tea.KeyDown:
 		m.inputFocus = (m.inputFocus + 1) % apiKeyFormFieldCount
 		return m, nil
@@ -354,6 +386,7 @@ func (m *Model) updateAPIKeyInput(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			DefaultModel:  m.selectedProvider.DefaultModel,
 			ModelMappings: m.selectedProvider.ModelMappings,
 			APIKeyRef:     ref,
+			KeyEnvVar:     m.selectedProvider.KeyEnvVar,
 		}
 
 		// Set model if user provided one (e.g. for OpenRouter)
@@ -408,14 +441,24 @@ func (m *Model) updateAPIKeyInput(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 // updateCustomProvider handles input for the custom provider form
 func (m *Model) updateCustomProvider(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	// Model picker intercepts input when open
+	if m.updateModelPicker(msg) {
+		return m, nil
+	}
+
 	switch msg.Type {
 	case tea.KeyEsc:
 		m.screen = ScreenMain
 		m.resetCustomProviderForm()
+		m.resetModelPicker()
 		return m, nil
 	case tea.KeyCtrlC:
 		m.done = true
 		return m, tea.Quit
+	case tea.KeyCtrlF:
+		if m.isOnModelField() {
+			return m, m.triggerModelFetch()
+		}
 	case tea.KeyTab, tea.KeyDown:
 		// Cycle through form fields
 		m.inputFocus = (m.inputFocus + 1) % customFormFieldCount

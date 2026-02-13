@@ -8,6 +8,76 @@ import (
 	"github.com/sammcj/skint/internal/config"
 )
 
+// renderModelPicker renders the model picker overlay.
+func (m *Model) renderModelPicker() string {
+	if m.modelFetching {
+		return m.styles.Dimmed.Render("  Fetching models...")
+	}
+	if m.modelFetchErr != "" {
+		return m.styles.Dimmed.Render("  Could not fetch models: " + m.modelFetchErr)
+	}
+	if !m.modelPickerOpen || len(m.fetchedModels) == 0 {
+		return ""
+	}
+
+	filtered := m.filteredModels()
+	if len(filtered) == 0 {
+		return m.styles.Dimmed.Render("  No models match filter")
+	}
+
+	var b strings.Builder
+
+	// Calculate visible window
+	start := 0
+	end := len(filtered)
+	if end > maxPickerVisible {
+		// Keep selected item visible
+		if m.modelPickerIdx >= maxPickerVisible {
+			start = m.modelPickerIdx - maxPickerVisible + 1
+		}
+		end = start + maxPickerVisible
+		if end > len(filtered) {
+			end = len(filtered)
+			start = end - maxPickerVisible
+			if start < 0 {
+				start = 0
+			}
+		}
+	}
+
+	for i := start; i < end; i++ {
+		mi := filtered[i]
+		label := mi.Label()
+		if i == m.modelPickerIdx {
+			b.WriteString(m.styles.ListSelected.Render("  > " + label))
+		} else {
+			b.WriteString(m.styles.Dimmed.Render("    " + label))
+		}
+		b.WriteString("\n")
+	}
+
+	if len(filtered) > maxPickerVisible {
+		b.WriteString(m.styles.Dimmed.Render(fmt.Sprintf("  (%d/%d shown, type to filter)", min(maxPickerVisible, len(filtered)), len(filtered))))
+		b.WriteString("\n")
+	}
+
+	return b.String()
+}
+
+// modelPickerHelpHint returns help text for the model picker based on current state.
+func (m *Model) modelPickerHelpHint() string {
+	if m.modelPickerOpen {
+		return "↑/↓: select model • enter: confirm • esc: close • type: filter"
+	}
+	if m.isOnModelField() && len(m.fetchedModels) > 0 {
+		return "ctrl+f: re-fetch models"
+	}
+	if m.isOnModelField() {
+		return "ctrl+f: fetch models"
+	}
+	return ""
+}
+
 func (m *Model) viewMainScreen() string {
 	var b strings.Builder
 
@@ -24,8 +94,8 @@ func (m *Model) viewMainScreen() string {
 		}
 	}
 
-	// Show active provider in header — default to Native Anthropic when no custom provider is set
-	activeDisplayName := "Native Anthropic"
+	// Show active provider in header — default to Claude Subscription when no custom provider is set
+	activeDisplayName := "Claude Subscription"
 	if m.cfg.DefaultProvider != "" {
 		activeDisplayName = m.cfg.DefaultProvider
 		// Use the display name if we can find the provider
@@ -131,7 +201,16 @@ func (m *Model) viewProviderConfig() string {
 			}
 		}
 		b.WriteString(inputLine)
-		b.WriteString("\n\n")
+		b.WriteString("\n")
+
+		// Render model picker after the model field
+		if f.focus == 2 {
+			pickerView := m.renderModelPicker()
+			if pickerView != "" {
+				b.WriteString(pickerView)
+			}
+		}
+		b.WriteString("\n")
 	}
 
 	// Error message
@@ -141,7 +220,11 @@ func (m *Model) viewProviderConfig() string {
 	}
 
 	// Help
-	help := m.styles.Help.Render("↑/↓/tab: navigate • enter: save • esc: back")
+	helpParts := "↑/↓/tab: navigate • enter: save • esc: back"
+	if hint := m.modelPickerHelpHint(); hint != "" {
+		helpParts += " • " + hint
+	}
+	help := m.styles.Help.Render(helpParts)
 	b.WriteString(m.styles.Footer.Render(help))
 
 	return b.String()
@@ -194,9 +277,13 @@ func (m *Model) viewAPIKeyInput() string {
 	b.WriteString("\n\n")
 
 	// Provider info
+	endpoint := m.selectedProvider.BaseURL
+	if endpoint == "" {
+		endpoint = "(default)"
+	}
 	info := m.styles.Box.Width(m.width - 8).Render(
 		m.styles.Label.Render("Provider: ") + m.selectedProvider.DisplayName + "\n" +
-			m.styles.Label.Render("Endpoint: ") + m.styles.Info.Render(m.selectedProvider.BaseURL),
+			m.styles.Label.Render("Endpoint: ") + m.styles.Info.Render(endpoint),
 	)
 	b.WriteString(info)
 	b.WriteString("\n\n")
@@ -264,7 +351,14 @@ func (m *Model) viewAPIKeyInput() string {
 	} else {
 		b.WriteString(m.styles.Value.Render("  " + displayModel))
 	}
-	b.WriteString("\n\n")
+	b.WriteString("\n")
+
+	// Model picker
+	pickerView := m.renderModelPicker()
+	if pickerView != "" {
+		b.WriteString(pickerView)
+	}
+	b.WriteString("\n")
 
 	// Error message
 	if m.inputError != "" {
@@ -273,7 +367,11 @@ func (m *Model) viewAPIKeyInput() string {
 	}
 
 	// Help
-	help := m.styles.Help.Render("↑/↓/tab: navigate • enter: save • esc: cancel")
+	helpParts := "↑/↓/tab: navigate • enter: save • esc: cancel"
+	if hint := m.modelPickerHelpHint(); hint != "" {
+		helpParts += " • " + hint
+	}
+	help := m.styles.Help.Render(helpParts)
 	b.WriteString(m.styles.Footer.Render(help))
 
 	return b.String()
@@ -431,7 +529,16 @@ func (m *Model) viewCustomProvider() string {
 			}
 		}
 		b.WriteString(inputLine)
-		b.WriteString("\n\n")
+		b.WriteString("\n")
+
+		// Render model picker after the model field
+		if f.focus == 4 {
+			pickerView := m.renderModelPicker()
+			if pickerView != "" {
+				b.WriteString(pickerView)
+			}
+		}
+		b.WriteString("\n")
 	}
 
 	// API Type explanation
@@ -451,7 +558,11 @@ func (m *Model) viewCustomProvider() string {
 	b.WriteString("\n")
 
 	// Help
-	help := m.styles.Help.Render("↑/↓/tab: navigate • enter: submit • esc: cancel")
+	helpParts := "↑/↓/tab: navigate • enter: submit • esc: cancel"
+	if hint := m.modelPickerHelpHint(); hint != "" {
+		helpParts += " • " + hint
+	}
+	help := m.styles.Help.Render(helpParts)
 	b.WriteString(m.styles.Footer.Render(help))
 
 	return b.String()

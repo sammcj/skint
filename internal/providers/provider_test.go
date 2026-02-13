@@ -96,6 +96,20 @@ func TestBuiltinProvider_GetEnvVars(t *testing.T) {
 	}
 }
 
+func TestBuiltinProvider_GetEnvVars_KeyEnvVar(t *testing.T) {
+	// When keyEnvVar is set, the API key should use that env var instead of ANTHROPIC_AUTH_TOKEN
+	p := &BuiltinProvider{baseProvider: baseProvider{
+		name:      "anthropic",
+		apiKey:    "sk-ant-test",
+		keyEnvVar: "ANTHROPIC_API_KEY",
+	}}
+	got := p.GetEnvVars()
+	want := map[string]string{
+		"ANTHROPIC_API_KEY": "sk-ant-test",
+	}
+	assertEnvVars(t, got, want)
+}
+
 func TestOpenRouterProvider_GetEnvVars(t *testing.T) {
 	tests := []struct {
 		name     string
@@ -411,6 +425,32 @@ func TestFromConfig_NativeBuiltinNoAPIKey(t *testing.T) {
 	if len(env) != 0 {
 		t.Errorf("native provider GetEnvVars() should be empty, got %v", env)
 	}
+}
+
+func TestFromConfig_AnthropicAPIProvider(t *testing.T) {
+	// The anthropic provider should use ANTHROPIC_API_KEY instead of ANTHROPIC_AUTH_TOKEN,
+	// should need an API key, and should not require a base URL.
+	cp := &config.Provider{
+		Name:      "anthropic",
+		Type:      config.ProviderTypeBuiltin,
+		KeyEnvVar: "ANTHROPIC_API_KEY",
+	}
+	cp.SetResolvedAPIKey("sk-ant-real-key")
+
+	p, err := FromConfig(cp)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if !p.NeedsAPIKey() {
+		t.Error("anthropic provider should need an API key")
+	}
+
+	env := p.GetEnvVars()
+	wantEnv := map[string]string{
+		"ANTHROPIC_API_KEY": "sk-ant-real-key",
+	}
+	assertEnvVars(t, env, wantEnv)
 }
 
 func TestFromConfig_OpenRouterUsesModelField(t *testing.T) {

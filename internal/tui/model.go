@@ -11,6 +11,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/sammcj/skint/internal/config"
+	"github.com/sammcj/skint/internal/models"
 	"github.com/sammcj/skint/internal/providers"
 	"github.com/sammcj/skint/internal/secrets"
 )
@@ -75,6 +76,13 @@ type Model struct {
 	localProviderURL       string
 	localProviderAuthToken string
 	localProviderModel     string
+
+	// Model picker state
+	fetchedModels   []models.ModelInfo
+	modelPickerOpen bool
+	modelPickerIdx  int
+	modelFetching   bool
+	modelFetchErr   string
 
 	// Results
 	message      string
@@ -181,13 +189,19 @@ func NewModel(cfg *config.Config, secretsMgr *secrets.Manager) *Model {
 	// Add providers by category
 	grouped := registry.GroupedList()
 
-	// Native (always configured - no setup required)
+	// Native group: "native" (Claude Subscription) is always configured, others may need API key
 	if native, ok := grouped["Native"]; ok {
 		for _, def := range native {
+			needsKey := def.Name != "native"
+			configured := !needsKey
+			if needsKey {
+				p := cfg.GetProvider(def.Name)
+				configured = p != nil && p.IsConfigured()
+			}
 			item := ProviderItem{
 				definition: def,
-				configured: true,
-				active:     cfg.DefaultProvider == def.Name || cfg.DefaultProvider == "",
+				configured: configured,
+				active:     cfg.DefaultProvider == def.Name || (cfg.DefaultProvider == "" && def.Name == "native"),
 				category:   "Native",
 			}
 			items = append(items, item)
@@ -205,22 +219,6 @@ func NewModel(cfg *config.Config, secretsMgr *secrets.Manager) *Model {
 				configured: configured,
 				active:     cfg.DefaultProvider == def.Name,
 				category:   "International",
-			}
-			items = append(items, item)
-			providerItems = append(providerItems, item)
-		}
-	}
-
-	// China
-	if china, ok := grouped["China"]; ok {
-		for _, def := range china {
-			p := cfg.GetProvider(def.Name)
-			configured := p != nil && p.IsConfigured()
-			item := ProviderItem{
-				definition: def,
-				configured: configured,
-				active:     cfg.DefaultProvider == def.Name,
-				category:   "China",
 			}
 			items = append(items, item)
 			providerItems = append(providerItems, item)
@@ -283,8 +281,7 @@ func NewModel(cfg *config.Config, secretsMgr *secrets.Manager) *Model {
 			"Custom":        0,
 			"Native":        1,
 			"International": 2,
-			"China":         3,
-			"Local":         4,
+			"Local":         3,
 		}
 		pi := categoryPriority[itemI.category]
 		pj := categoryPriority[itemJ.category]
@@ -358,13 +355,19 @@ func (m *Model) refreshProviderList() {
 	providerItems := []ProviderItem{}
 	grouped := m.registry.GroupedList()
 
-	// Native (always configured)
+	// Native group
 	if native, ok := grouped["Native"]; ok {
 		for _, def := range native {
+			needsKey := def.Name != "native"
+			configured := !needsKey
+			if needsKey {
+				p := m.cfg.GetProvider(def.Name)
+				configured = p != nil && p.IsConfigured()
+			}
 			item := ProviderItem{
 				definition: def,
-				configured: true,
-				active:     m.cfg.DefaultProvider == def.Name || m.cfg.DefaultProvider == "",
+				configured: configured,
+				active:     m.cfg.DefaultProvider == def.Name || (m.cfg.DefaultProvider == "" && def.Name == "native"),
 				category:   "Native",
 			}
 			items = append(items, item)
@@ -382,22 +385,6 @@ func (m *Model) refreshProviderList() {
 				configured: configured,
 				active:     m.cfg.DefaultProvider == def.Name,
 				category:   "International",
-			}
-			items = append(items, item)
-			providerItems = append(providerItems, item)
-		}
-	}
-
-	// China
-	if china, ok := grouped["China"]; ok {
-		for _, def := range china {
-			p := m.cfg.GetProvider(def.Name)
-			configured := p != nil && p.IsConfigured()
-			item := ProviderItem{
-				definition: def,
-				configured: configured,
-				active:     m.cfg.DefaultProvider == def.Name,
-				category:   "China",
 			}
 			items = append(items, item)
 			providerItems = append(providerItems, item)
@@ -452,7 +439,7 @@ func (m *Model) refreshProviderList() {
 			return itemI.configured && !itemJ.configured
 		}
 		categoryPriority := map[string]int{
-			"Custom": 0, "Native": 1, "International": 2, "China": 3, "Local": 4,
+			"Custom": 0, "Native": 1, "International": 2, "Local": 3,
 		}
 		pi := categoryPriority[itemI.category]
 		pj := categoryPriority[itemJ.category]
@@ -498,6 +485,19 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if msg.Height < 24 {
 			m.SetCompact(true)
 		}
+
+	case modelsFetchedMsg:
+		m.modelFetching = false
+		if msg.err != nil {
+			m.modelFetchErr = msg.err.Error()
+		} else {
+			m.fetchedModels = msg.models
+			if len(msg.models) > 0 {
+				m.modelPickerOpen = true
+				m.modelPickerIdx = 0
+			}
+		}
+		return m, nil
 
 	case tea.KeyMsg:
 		switch m.screen {

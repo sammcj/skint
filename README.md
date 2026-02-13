@@ -1,6 +1,6 @@
 # Skint
 
-Multi-provider launcher for [Claude Code](https://docs.anthropic.com/en/docs/claude-code). Switch between LLM providers with a single command -- use Z.AI, MiniMax, Kimi, DeepSeek, OpenRouter, llama.cpp, and other endpoints without reconfiguring Claude Code each time.
+Multi-provider launcher for [Claude Code](https://docs.anthropic.com/en/docs/claude-code). Switch between LLM providers with a single command -- use Z.AI, MiniMax, Kimi, DeepSeek, OpenRouter, Anthropic API, llama.cpp, and other endpoints without reconfiguring Claude Code each time.
 
 Skint sets the appropriate environment variables (`ANTHROPIC_BASE_URL`, `ANTHROPIC_AUTH_TOKEN`, model mappings, etc.) and then exec's into the `claude` binary, replacing the current process for clean signal handling.
 
@@ -41,24 +41,26 @@ skint test zai
 
 ## Built-in providers
 
-| Name         | Provider            | Model                           | Region        |
-| ------------ | ------------------- | ------------------------------- | ------------- |
-| `native`     | Anthropic direct    | (Claude default)                | Global        |
-| `zai`        | Z.AI                | GLM-5                           | International |
-| `zai-cn`     | Z.AI China          | GLM-5                           | China         |
-| `minimax`    | MiniMax             | M2.5                            | International |
-| `minimax-cn` | MiniMax China       | M2.5                            | China         |
-| `kimi`       | Kimi                | kimi-k2.5                       | International |
-| `moonshot`   | Moonshot AI         | kimi-k2.5                       | International |
-| `deepseek`   | DeepSeek            | deepseek-chat                   | International |
-| `mimo`       | Xiaomi MiMo         | mimo-v2-flash                   | International |
-| `ve`         | VolcEngine / Doubao | doubao-seed-code-preview-latest | China         |
-| `openrouter` | OpenRouter          | (any)                           | Global        |
-| `lmstudio`   | LM Studio (local)   | --                              | Local         |
-| `llamacpp`   | llama.cpp (local)   | --                              | Local         |
-| `ollama`     | Ollama (local)      | --                              | Local         |
+| Name         | Provider              | Model         | Category      |
+| ------------ | --------------------- | ------------- | ------------- |
+| `native`     | Claude Subscription   | (default)     | Native        |
+| `anthropic`  | Anthropic API         | (default)     | Native        |
+| `zai`        | Z.AI                  | GLM-5         | International |
+| `minimax`    | MiniMax               | M2.5          | International |
+| `kimi`       | Kimi                  | kimi-k2.5     | International |
+| `moonshot`   | Moonshot AI           | kimi-k2.5     | International |
+| `deepseek`   | DeepSeek              | deepseek-chat | International |
+| `openrouter` | OpenRouter            | (any)         | International |
+| `ollama`     | Ollama (local)        | --            | Local         |
+| `lmstudio`   | LM Studio (local)     | --            | Local         |
+| `llamacpp`   | llama.cpp (local)     | --            | Local         |
+
+- **Claude Subscription** (`native`) -- pass-through to your existing Claude subscription. No config needed.
+- **Anthropic API** (`anthropic`) -- direct API access using `ANTHROPIC_API_KEY`. Requires an API key from console.anthropic.com.
 
 You can also add custom providers (Anthropic-compatible or OpenAI-compatible endpoints) via `skint config add`.
+
+When configuring a provider in the TUI, the model field supports fetching available models from the provider's API. Press `Ctrl+F` on the model field to fetch models, or they'll be fetched automatically when editing an existing provider.
 
 ## Commands
 

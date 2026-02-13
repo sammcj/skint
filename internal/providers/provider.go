@@ -44,15 +44,16 @@ type Provider interface {
 
 // baseProvider contains common provider functionality
 type baseProvider struct {
-	name        string
-	displayName string
-	description string
-	providerType string
-	baseURL     string
-	apiKey      string
-	model       string
+	name          string
+	displayName   string
+	description   string
+	providerType  string
+	baseURL       string
+	apiKey        string
+	model         string
 	modelMappings map[string]string
-	needsAPIKey bool
+	needsAPIKey   bool
+	keyEnvVar     string // env var name for API key (default: ANTHROPIC_AUTH_TOKEN)
 }
 
 func (p *baseProvider) Name() string {
@@ -118,7 +119,11 @@ func (p *BuiltinProvider) GetEnvVars() map[string]string {
 	}
 
 	if p.apiKey != "" {
-		env["ANTHROPIC_AUTH_TOKEN"] = p.apiKey
+		envVar := "ANTHROPIC_AUTH_TOKEN"
+		if p.keyEnvVar != "" {
+			envVar = p.keyEnvVar
+		}
+		env[envVar] = p.apiKey
 	}
 
 	if p.model != "" {
@@ -245,6 +250,7 @@ func FromConfig(cp *config.Provider) (Provider, error) {
 		model:         cp.DefaultModel,
 		modelMappings: cp.ModelMappings,
 		needsAPIKey:   cp.NeedsAPIKey(),
+		keyEnvVar:     cp.KeyEnvVar,
 	}
 
 	switch cp.Type {
@@ -288,6 +294,7 @@ type Definition struct {
 	ModelMappings map[string]string
 	AuthToken     string // For local providers
 	KeyVar        string // Environment variable name for API key
+	KeyEnvVar     string // env var name to set for Claude (default: ANTHROPIC_AUTH_TOKEN)
 }
 
 // NewRegistry creates a new provider registry with built-in definitions
@@ -318,17 +325,14 @@ func (r *Registry) List() []*Definition {
 func (r *Registry) GroupedList() map[string][]*Definition {
 	groups := map[string][]*Definition{
 		"Native":        {},
-		"China":         {},
 		"International": {},
 		"Local":         {},
 	}
 
 	for _, def := range r.definitions {
 		switch def.Name {
-		case "native":
+		case "native", "anthropic":
 			groups["Native"] = append(groups["Native"], def)
-		case "zai-cn", "minimax-cn", "ve":
-			groups["China"] = append(groups["China"], def)
 		case "ollama", "lmstudio", "llamacpp":
 			groups["Local"] = append(groups["Local"], def)
 		default:
@@ -343,9 +347,17 @@ func (r *Registry) registerBuiltins() {
 	builtins := []*Definition{
 		{
 			Name:        "native",
-			DisplayName: "Native Anthropic",
-			Description: "Anthropic direct (no config needed)",
+			DisplayName: "Claude Subscription",
+			Description: "Uses your Claude subscription (no config needed)",
 			Type:        config.ProviderTypeBuiltin,
+		},
+		{
+			Name:        "anthropic",
+			DisplayName: "Anthropic API",
+			Description: "Direct Anthropic API access",
+			Type:        config.ProviderTypeBuiltin,
+			KeyVar:      "ANTHROPIC_API_KEY",
+			KeyEnvVar:   "ANTHROPIC_API_KEY",
 		},
 		{
 			Name:        "openrouter",
@@ -366,16 +378,6 @@ func (r *Registry) registerBuiltins() {
 			KeyVar:        "ZAI_API_KEY",
 		},
 		{
-			Name:          "zai-cn",
-			DisplayName:   "Z.AI China",
-			Description:   "Z.AI China (GLM-5)",
-			Type:          config.ProviderTypeBuiltin,
-			BaseURL:       "https://open.bigmodel.cn/api/anthropic",
-			DefaultModel:  "glm-5",
-			ModelMappings: map[string]string{"haiku": "glm-5", "sonnet": "glm-5", "opus": "glm-5"},
-			KeyVar:        "ZAI_CN_API_KEY",
-		},
-		{
 			Name:         "minimax",
 			DisplayName:  "MiniMax",
 			Description:  "MiniMax International (M2.5)",
@@ -383,15 +385,6 @@ func (r *Registry) registerBuiltins() {
 			BaseURL:      "https://api.minimax.io/anthropic",
 			DefaultModel: "MiniMax-M2.5",
 			KeyVar:       "MINIMAX_API_KEY",
-		},
-		{
-			Name:         "minimax-cn",
-			DisplayName:  "MiniMax China",
-			Description:  "MiniMax China (M2.5)",
-			Type:         config.ProviderTypeBuiltin,
-			BaseURL:      "https://api.minimaxi.com/anthropic",
-			DefaultModel: "MiniMax-M2.5",
-			KeyVar:       "MINIMAX_CN_API_KEY",
 		},
 		{
 			Name:          "kimi",
@@ -413,15 +406,6 @@ func (r *Registry) registerBuiltins() {
 			KeyVar:       "MOONSHOT_API_KEY",
 		},
 		{
-			Name:         "ve",
-			DisplayName:  "VolcEngine",
-			Description:  "VolcEngine (Doubao)",
-			Type:         config.ProviderTypeBuiltin,
-			BaseURL:      "https://ark.cn-beijing.volces.com/api/coding",
-			DefaultModel: "doubao-seed-code-preview-latest",
-			KeyVar:       "ARK_API_KEY",
-		},
-		{
 			Name:          "deepseek",
 			DisplayName:   "DeepSeek",
 			Description:   "DeepSeek Chat",
@@ -430,16 +414,6 @@ func (r *Registry) registerBuiltins() {
 			DefaultModel:  "deepseek-chat",
 			ModelMappings: map[string]string{"small": "deepseek-chat"},
 			KeyVar:        "DEEPSEEK_API_KEY",
-		},
-		{
-			Name:          "mimo",
-			DisplayName:   "Xiaomi MiMo",
-			Description:   "Xiaomi MiMo (mimo-v2-flash)",
-			Type:          config.ProviderTypeBuiltin,
-			BaseURL:       "https://api.xiaomimimo.com/anthropic",
-			DefaultModel:  "mimo-v2-flash",
-			ModelMappings: map[string]string{"haiku": "mimo-v2-flash", "sonnet": "mimo-v2-flash", "opus": "mimo-v2-flash"},
-			KeyVar:        "MIMO_API_KEY",
 		},
 		{
 			Name:        "ollama",
@@ -487,6 +461,7 @@ func (r *Registry) CreateProvider(name string, apiKey string) (Provider, error) 
 		DefaultModel:  def.DefaultModel,
 		ModelMappings: def.ModelMappings,
 		AuthToken:     def.AuthToken,
+		KeyEnvVar:     def.KeyEnvVar,
 	}
 
 	provider, err := FromConfig(cp)

@@ -47,6 +47,9 @@ type Provider struct {
 	// Custom provider specific
 	APIType string `yaml:"api_type,omitempty" mapstructure:"api_type"` // "anthropic" or "openai"
 
+	// Env var override for API key (e.g. ANTHROPIC_API_KEY instead of ANTHROPIC_AUTH_TOKEN)
+	KeyEnvVar string `yaml:"key_env_var,omitempty" mapstructure:"key_env_var"`
+
 	// Internal: loaded from keyring/file
 	resolvedAPIKey string
 }
@@ -129,8 +132,8 @@ func (p *Provider) Validate() error {
 	}
 
 	// Built-in, openrouter, and custom providers need base URL.
-	// Exception: "native" uses Anthropic's default endpoint.
-	if p.Type != ProviderTypeLocal && p.Name != "native" && p.BaseURL == "" {
+	// Exceptions: "native" and "anthropic" use Anthropic's default endpoint.
+	if p.Type != ProviderTypeLocal && p.Name != "native" && p.Name != "anthropic" && p.BaseURL == "" {
 		return fmt.Errorf("base_url is required for %s providers", p.Type)
 	}
 

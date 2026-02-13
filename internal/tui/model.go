@@ -85,10 +85,11 @@ type Model struct {
 	modelFetchErr   string
 
 	// Results
-	message      string
-	messageType  string // "success", "error", "info"
-	done         bool
-	resultAction string
+	message       string
+	messageType   string // "success", "error", "info"
+	done          bool
+	resultAction  string
+	successOption int // 0 = continue, 1 = launch claude
 
 	// Callbacks
 	onProviderSelect func(string) error
@@ -509,11 +510,10 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m.updateAPIKeyInput(msg)
 		case ScreenCustomProvider:
 			return m.updateCustomProvider(msg)
-		case ScreenSuccess, ScreenError:
-			// Any key returns to main screen (or quits if done)
-			if m.screen == ScreenSuccess && m.done {
-				return m, tea.Quit
-			}
+		case ScreenSuccess:
+			return m.updateSuccessScreen(msg)
+		case ScreenError:
+			// Any key returns to main screen
 			m.refreshProviderList()
 			m.screen = ScreenMain
 			return m, nil

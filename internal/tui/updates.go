@@ -90,6 +90,7 @@ func (m *Model) handleProviderSelect(item ProviderItem) (tea.Model, tea.Cmd) {
 		m.message = fmt.Sprintf("✓ %s is now the active provider", def.DisplayName)
 		m.messageType = "success"
 		m.screen = ScreenSuccess
+		m.successOption = 0
 		return m, nil
 	}
 
@@ -99,6 +100,7 @@ func (m *Model) handleProviderSelect(item ProviderItem) (tea.Model, tea.Cmd) {
 		m.message = fmt.Sprintf("✓ %s is now the active provider", def.DisplayName)
 		m.messageType = "success"
 		m.screen = ScreenSuccess
+		m.successOption = 0
 		return m, nil
 	}
 
@@ -107,8 +109,7 @@ func (m *Model) handleProviderSelect(item ProviderItem) (tea.Model, tea.Cmd) {
 		m.initLocalProviderForm(def)
 		m.screen = ScreenProviderConfig
 		m.resetModelPicker()
-		// Auto-fetch models for local providers (no auth needed for listing)
-		return m, m.triggerModelFetch()
+		return m, nil
 	}
 
 	// Built-in/OpenRouter providers need API key (and optionally model)
@@ -142,9 +143,7 @@ func (m *Model) handleProviderEdit(item ProviderItem) (tea.Model, tea.Cmd) {
 
 	// Provider is configured - open appropriate edit screen
 	m.selectedProvider = def
-
 	m.resetModelPicker()
-	var cmd tea.Cmd
 
 	switch def.Type {
 	case config.ProviderTypeLocal:
@@ -155,7 +154,6 @@ func (m *Model) handleProviderEdit(item ProviderItem) (tea.Model, tea.Cmd) {
 		m.inputFocus = 0
 		m.inputError = ""
 		m.screen = ScreenProviderConfig
-		cmd = m.triggerModelFetch()
 	case config.ProviderTypeCustom:
 		// Custom providers - open custom provider form with existing values
 		m.customProviderName = p.Name
@@ -171,7 +169,6 @@ func (m *Model) handleProviderEdit(item ProviderItem) (tea.Model, tea.Cmd) {
 		m.inputFocus = 0
 		m.inputError = ""
 		m.screen = ScreenCustomProvider
-		cmd = m.triggerModelFetch()
 	default:
 		// Built-in/OpenRouter providers - open API key + model input
 		m.screen = ScreenAPIKeyInput
@@ -180,13 +177,9 @@ func (m *Model) handleProviderEdit(item ProviderItem) (tea.Model, tea.Cmd) {
 		m.modelInput = p.EffectiveModel()
 		m.inputError = ""
 		m.inputFocus = 0
-		// Auto-fetch if provider already has a key
-		if p.IsConfigured() {
-			cmd = m.triggerModelFetch()
-		}
 	}
 
-	return m, cmd
+	return m, nil
 }
 
 func (m *Model) initLocalProviderForm(def *providers.Definition) {
@@ -225,10 +218,10 @@ func (m *Model) updateProviderConfig(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 	case tea.KeyTab, tea.KeyDown:
 		m.inputFocus = (m.inputFocus + 1) % localFormFieldCount
-		return m, nil
+		return m, m.fetchOnModelFocus()
 	case tea.KeyShiftTab, tea.KeyUp:
 		m.inputFocus = (m.inputFocus + localFormFieldCount - 1) % localFormFieldCount
-		return m, nil
+		return m, m.fetchOnModelFocus()
 	case tea.KeyEnter:
 		// Validate and submit
 		if m.localProviderURL == "" {
@@ -305,6 +298,7 @@ func (m *Model) submitLocalProvider() (tea.Model, tea.Cmd) {
 		m.message = fmt.Sprintf("✓ %s configured", m.selectedProvider.DisplayName)
 		m.messageType = "success"
 		m.screen = ScreenSuccess
+		m.successOption = 0
 	}
 	return m, nil
 }
@@ -332,10 +326,10 @@ func (m *Model) updateAPIKeyInput(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 	case tea.KeyTab, tea.KeyDown:
 		m.inputFocus = (m.inputFocus + 1) % apiKeyFormFieldCount
-		return m, nil
+		return m, m.fetchOnModelFocus()
 	case tea.KeyShiftTab, tea.KeyUp:
 		m.inputFocus = (m.inputFocus + apiKeyFormFieldCount - 1) % apiKeyFormFieldCount
-		return m, nil
+		return m, m.fetchOnModelFocus()
 	case tea.KeyEnter:
 		if m.apiKeyInput == "" && !m.hasExistingKey {
 			m.inputError = "API key is required"
@@ -364,6 +358,7 @@ func (m *Model) updateAPIKeyInput(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.message = fmt.Sprintf("✓ %s updated successfully", m.selectedProvider.DisplayName)
 			m.messageType = "success"
 			m.screen = ScreenSuccess
+			m.successOption = 0
 			m.apiKeyInput = ""
 			m.modelInput = ""
 			return m, nil
@@ -403,6 +398,7 @@ func (m *Model) updateAPIKeyInput(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.message = fmt.Sprintf("✓ %s configured successfully", m.selectedProvider.DisplayName)
 		m.messageType = "success"
 		m.screen = ScreenSuccess
+		m.successOption = 0
 		m.apiKeyInput = ""
 		m.modelInput = ""
 		return m, nil
@@ -462,11 +458,11 @@ func (m *Model) updateCustomProvider(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case tea.KeyTab, tea.KeyDown:
 		// Cycle through form fields
 		m.inputFocus = (m.inputFocus + 1) % customFormFieldCount
-		return m, nil
+		return m, m.fetchOnModelFocus()
 	case tea.KeyShiftTab, tea.KeyUp:
 		// Cycle backwards
 		m.inputFocus = (m.inputFocus + customFormFieldCount - 1) % customFormFieldCount
-		return m, nil
+		return m, m.fetchOnModelFocus()
 	case tea.KeyEnter:
 		// If on API type field, toggle between options
 		if m.inputFocus == 5 {
@@ -616,8 +612,65 @@ func (m *Model) submitCustomProvider() (tea.Model, tea.Cmd) {
 	m.message = fmt.Sprintf("✓ Custom provider '%s' added", displayName)
 	m.messageType = "success"
 	m.screen = ScreenSuccess
+	m.successOption = 0
 	// Don't quit - return to main screen so user can select it
 	m.resetCustomProviderForm()
+	return m, nil
+}
+
+func (m *Model) updateSuccessScreen(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	// Determine if we have a provider to launch with
+	providerName := ""
+	if m.selectedProvider != nil {
+		providerName = m.selectedProvider.Name
+	} else if m.customProviderName != "" {
+		providerName = m.customProviderName
+	}
+	hasLaunchOption := providerName != ""
+
+	switch msg.Type {
+	case tea.KeyCtrlC:
+		m.done = true
+		return m, tea.Quit
+	case tea.KeyUp, tea.KeyDown, tea.KeyTab:
+		if hasLaunchOption {
+			m.successOption = 1 - m.successOption // toggle between 0 and 1
+		}
+		return m, nil
+	case tea.KeyEnter:
+		if hasLaunchOption && m.successOption == 1 {
+			// Launch Claude with the configured provider
+			m.cfg.DefaultProvider = providerName
+			m.resultAction = "launch"
+			m.done = true
+			return m, tea.Quit
+		}
+		// Continue (return to main screen or exit)
+		if m.done {
+			return m, tea.Quit
+		}
+		m.refreshProviderList()
+		m.screen = ScreenMain
+		m.successOption = 0
+		return m, nil
+	case tea.KeyEsc:
+		// Esc always goes back to main
+		m.refreshProviderList()
+		m.screen = ScreenMain
+		m.successOption = 0
+		return m, nil
+	default:
+		// Any other key: if no launch option, just continue
+		if !hasLaunchOption {
+			if m.done {
+				return m, tea.Quit
+			}
+			m.refreshProviderList()
+			m.screen = ScreenMain
+			return m, nil
+		}
+	}
+
 	return m, nil
 }
 

@@ -403,15 +403,33 @@ func (m *Model) viewSuccess() string {
 		)
 		b.WriteString(next)
 		b.WriteString("\n\n")
+
+		// Action buttons
+		continueLabel := "  Continue  "
+		launchLabel := fmt.Sprintf("  Launch Claude with %s  ", providerName)
+		if m.successOption == 0 {
+			continueLabel = m.styles.ListSelected.Render(continueLabel)
+			launchLabel = m.styles.Dimmed.Render(launchLabel)
+		} else {
+			continueLabel = m.styles.Dimmed.Render(continueLabel)
+			launchLabel = m.styles.ListSelected.Render(launchLabel)
+		}
+		b.WriteString(continueLabel + "  " + launchLabel)
+		b.WriteString("\n\n")
 	}
 
-	// Help - different message based on whether we're quitting or returning
-	helpText := "press any key to continue..."
-	if m.done {
-		helpText = "press any key to exit..."
+	// Help
+	if providerName != "" {
+		help := m.styles.Help.Render("↑/↓: select • enter: confirm • esc: back")
+		b.WriteString(m.styles.Footer.Render(help))
+	} else {
+		helpText := "press any key to continue..."
+		if m.done {
+			helpText = "press any key to exit..."
+		}
+		help := m.styles.Help.Render(helpText)
+		b.WriteString(m.styles.Footer.Render(help))
 	}
-	help := m.styles.Help.Render(helpText)
-	b.WriteString(m.styles.Footer.Render(help))
 
 	return b.String()
 }

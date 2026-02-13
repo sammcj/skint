@@ -99,6 +99,23 @@ func (m *Model) updateModelPicker(msg tea.KeyMsg) bool {
 	return true
 }
 
+// fetchOnModelFocus triggers a model fetch if the focus just landed on the model
+// field and models haven't been fetched yet. Returns nil if no fetch is needed.
+func (m *Model) fetchOnModelFocus() tea.Cmd {
+	if !m.isOnModelField() {
+		return nil
+	}
+	if m.fetchedModels != nil || m.modelFetching {
+		// Already fetched or in progress -- just re-open the picker if we have results
+		if len(m.fetchedModels) > 0 && !m.modelPickerOpen {
+			m.modelPickerOpen = true
+			m.modelPickerIdx = 0
+		}
+		return nil
+	}
+	return m.triggerModelFetch()
+}
+
 // triggerModelFetch starts an async model fetch if not already fetching.
 func (m *Model) triggerModelFetch() tea.Cmd {
 	if m.modelFetching {

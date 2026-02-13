@@ -6,6 +6,7 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/sammcj/skint/internal/config"
+	"github.com/sammcj/skint/internal/providers"
 )
 
 func (m *Model) updateMainScreen(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
@@ -38,7 +39,7 @@ func (m *Model) updateMainScreen(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			}
 		case "e":
 			if !m.list.SettingFilter() {
-				if item, ok := m.list.SelectedItem().(ProviderItem); ok {
+				if item, ok := m.list.SelectedItem().(ProviderItem); ok && !item.isAddNew {
 					return m.handleProviderEdit(item)
 				}
 			}
@@ -53,6 +54,12 @@ func (m *Model) updateMainScreen(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, tea.Quit
 	case tea.KeyEnter:
 		if item, ok := m.list.SelectedItem().(ProviderItem); ok {
+			if item.isAddNew {
+				m.screen = ScreenCustomProvider
+				m.inputFocus = 0
+				m.resetCustomProviderForm()
+				return m, nil
+			}
 			m.selectedProvider = item.definition
 			return m.handleProviderSelect(item)
 		}
@@ -97,8 +104,9 @@ func (m *Model) handleProviderSelect(item ProviderItem) (tea.Model, tea.Cmd) {
 		return m, nil
 	}
 
-	// Local providers need different handling
+	// Local providers need a config form
 	if def.Type == config.ProviderTypeLocal {
+		m.initLocalProviderForm(def)
 		m.screen = ScreenProviderConfig
 		return m, nil
 	}
@@ -129,7 +137,12 @@ func (m *Model) handleProviderEdit(item ProviderItem) (tea.Model, tea.Cmd) {
 
 	switch def.Type {
 	case config.ProviderTypeLocal:
-		// Local providers - show config screen
+		// Local providers - show config form with existing values
+		m.localProviderURL = p.BaseURL
+		m.localProviderAuthToken = p.AuthToken
+		m.localProviderModel = p.EffectiveModel()
+		m.inputFocus = 0
+		m.inputError = ""
 		m.screen = ScreenProviderConfig
 	case config.ProviderTypeCustom:
 		// Custom providers - open custom provider form with existing values
@@ -157,6 +170,22 @@ func (m *Model) handleProviderEdit(item ProviderItem) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
+func (m *Model) initLocalProviderForm(def *providers.Definition) {
+	// Pre-populate from existing config if available, otherwise use definition defaults
+	p := m.cfg.GetProvider(def.Name)
+	if p != nil {
+		m.localProviderURL = p.BaseURL
+		m.localProviderAuthToken = p.AuthToken
+		m.localProviderModel = p.EffectiveModel()
+	} else {
+		m.localProviderURL = def.BaseURL
+		m.localProviderAuthToken = def.AuthToken
+		m.localProviderModel = def.DefaultModel
+	}
+	m.inputFocus = 0
+	m.inputError = ""
+}
+
 func (m *Model) updateProviderConfig(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch msg.Type {
 	case tea.KeyEsc:
@@ -165,30 +194,88 @@ func (m *Model) updateProviderConfig(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case tea.KeyCtrlC:
 		m.done = true
 		return m, tea.Quit
+	case tea.KeyTab, tea.KeyDown:
+		m.inputFocus = (m.inputFocus + 1) % localFormFieldCount
+		return m, nil
+	case tea.KeyShiftTab, tea.KeyUp:
+		m.inputFocus = (m.inputFocus + localFormFieldCount - 1) % localFormFieldCount
+		return m, nil
 	case tea.KeyEnter:
-		// Add local provider to config
-		if m.selectedProvider != nil {
-			provider := &config.Provider{
-				Name:        m.selectedProvider.Name,
-				Type:        m.selectedProvider.Type,
-				DisplayName: m.selectedProvider.DisplayName,
-				Description: m.selectedProvider.Description,
-				BaseURL:     m.selectedProvider.BaseURL,
-				AuthToken:   m.selectedProvider.AuthToken,
+		// Validate and submit
+		if m.localProviderURL == "" {
+			m.inputError = "Base URL is required"
+			m.inputFocus = 0
+			return m, nil
+		}
+		if !strings.HasPrefix(m.localProviderURL, "http://") && !strings.HasPrefix(m.localProviderURL, "https://") {
+			m.inputError = "URL must start with http:// or https://"
+			m.inputFocus = 0
+			return m, nil
+		}
+		return m.submitLocalProvider()
+	case tea.KeyBackspace:
+		m.inputError = ""
+		switch m.inputFocus {
+		case 0:
+			if len(m.localProviderURL) > 0 {
+				m.localProviderURL = m.localProviderURL[:len(m.localProviderURL)-1]
 			}
-			m.cfg.RemoveProvider(provider.Name)
-			if err := m.cfg.AddProvider(provider); err != nil {
-				m.message = err.Error()
-				m.messageType = "error"
-				m.screen = ScreenError
-			} else {
-				m.message = fmt.Sprintf("✓ %s added", m.selectedProvider.DisplayName)
-				m.messageType = "success"
-				m.screen = ScreenSuccess
-				// Return to main screen so user can select it
+		case 1:
+			if len(m.localProviderAuthToken) > 0 {
+				m.localProviderAuthToken = m.localProviderAuthToken[:len(m.localProviderAuthToken)-1]
+			}
+		case 2:
+			if len(m.localProviderModel) > 0 {
+				m.localProviderModel = m.localProviderModel[:len(m.localProviderModel)-1]
 			}
 		}
 		return m, nil
+	}
+
+	// Handle rune input
+	if msg.Type == tea.KeyRunes && len(msg.Runes) > 0 {
+		m.inputError = ""
+		for _, r := range msg.Runes {
+			if r >= 32 && r < 127 {
+				switch m.inputFocus {
+				case 0:
+					m.localProviderURL += string(r)
+				case 1:
+					m.localProviderAuthToken += string(r)
+				case 2:
+					m.localProviderModel += string(r)
+				}
+			}
+		}
+	}
+
+	return m, nil
+}
+
+func (m *Model) submitLocalProvider() (tea.Model, tea.Cmd) {
+	if m.selectedProvider == nil {
+		return m, nil
+	}
+
+	provider := &config.Provider{
+		Name:        m.selectedProvider.Name,
+		Type:        m.selectedProvider.Type,
+		DisplayName: m.selectedProvider.DisplayName,
+		Description: m.selectedProvider.Description,
+		BaseURL:     m.localProviderURL,
+		AuthToken:   m.localProviderAuthToken,
+		Model:       m.localProviderModel,
+	}
+
+	m.cfg.RemoveProvider(provider.Name)
+	if err := m.cfg.AddProvider(provider); err != nil {
+		m.message = err.Error()
+		m.messageType = "error"
+		m.screen = ScreenError
+	} else {
+		m.message = fmt.Sprintf("✓ %s configured", m.selectedProvider.DisplayName)
+		m.messageType = "success"
+		m.screen = ScreenSuccess
 	}
 	return m, nil
 }

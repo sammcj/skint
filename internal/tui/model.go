@@ -32,6 +32,9 @@ const (
 // customFormFieldCount is the number of fields in the custom provider form
 const customFormFieldCount = 6
 
+// localFormFieldCount is the number of fields in the local provider config form
+const localFormFieldCount = 3
+
 // Model is the main TUI model
 type Model struct {
 	// State
@@ -63,6 +66,11 @@ type Model struct {
 	customProviderModel    string
 	customProviderAPIType  string // "anthropic" or "openai"
 
+	// Local provider form fields
+	localProviderURL       string
+	localProviderAuthToken string
+	localProviderModel     string
+
 	// Results
 	message      string
 	messageType  string // "success", "error", "info"
@@ -78,22 +86,37 @@ type Model struct {
 type ProviderItem struct {
 	definition *providers.Definition
 	configured bool
+	active     bool
 	category   string
+	isAddNew   bool
 }
 
 func (p ProviderItem) FilterValue() string {
+	if p.isAddNew {
+		return "add new custom provider"
+	}
 	return p.definition.Name + " " + p.definition.DisplayName
 }
 
 func (p ProviderItem) Title() string {
+	if p.isAddNew {
+		return "+ Add New Provider"
+	}
 	status := "○"
 	if p.configured {
 		status = "✓"
 	}
-	return fmt.Sprintf("%s %s", status, p.definition.DisplayName)
+	activeIndicator := " "
+	if p.active {
+		activeIndicator = "▶"
+	}
+	return fmt.Sprintf("%s %s %s", status, activeIndicator, p.definition.DisplayName)
 }
 
 func (p ProviderItem) Description() string {
+	if p.isAddNew {
+		return "Configure a custom API endpoint (OpenAI or Anthropic compatible)"
+	}
 	return p.definition.Description
 }
 
@@ -122,12 +145,19 @@ func (d itemDelegate) Render(w io.Writer, m list.Model, index int, listItem list
 		desc = d.styles.Dimmed.PaddingLeft(4)
 	}
 
-	// Color the status indicator
+	// Color the status indicators / add-new styling
 	titleStr := item.Title()
-	if item.configured {
-		titleStr = strings.Replace(titleStr, "✓", d.styles.Success.Render("✓"), 1)
+	if item.isAddNew {
+		titleStr = strings.Replace(titleStr, "+", d.styles.Info.Render("+"), 1)
 	} else {
-		titleStr = strings.Replace(titleStr, "○", d.styles.Dimmed.Render("○"), 1)
+		if item.configured {
+			titleStr = strings.Replace(titleStr, "✓", d.styles.Success.Render("✓"), 1)
+		} else {
+			titleStr = strings.Replace(titleStr, "○", d.styles.Dimmed.Render("○"), 1)
+		}
+		if item.active {
+			titleStr = strings.Replace(titleStr, "▶", d.styles.Info.Render("▶"), 1)
+		}
 	}
 
 	fmt.Fprint(w, title.Render(titleStr)+"\n")
@@ -146,14 +176,13 @@ func NewModel(cfg *config.Config, secretsMgr *secrets.Manager) *Model {
 	// Add providers by category
 	grouped := registry.GroupedList()
 
-	// Native
+	// Native (always configured - no setup required)
 	if native, ok := grouped["Native"]; ok {
 		for _, def := range native {
-			p := cfg.GetProvider(def.Name)
-			configured := p != nil && (!p.NeedsAPIKey() || p.GetAPIKey() != "")
 			item := ProviderItem{
 				definition: def,
-				configured: configured,
+				configured: true,
+				active:     cfg.DefaultProvider == def.Name,
 				category:   "Native",
 			}
 			items = append(items, item)
@@ -169,6 +198,7 @@ func NewModel(cfg *config.Config, secretsMgr *secrets.Manager) *Model {
 			item := ProviderItem{
 				definition: def,
 				configured: configured,
+				active:     cfg.DefaultProvider == def.Name,
 				category:   "International",
 			}
 			items = append(items, item)
@@ -184,6 +214,7 @@ func NewModel(cfg *config.Config, secretsMgr *secrets.Manager) *Model {
 			item := ProviderItem{
 				definition: def,
 				configured: configured,
+				active:     cfg.DefaultProvider == def.Name,
 				category:   "China",
 			}
 			items = append(items, item)
@@ -199,6 +230,7 @@ func NewModel(cfg *config.Config, secretsMgr *secrets.Manager) *Model {
 			item := ProviderItem{
 				definition: def,
 				configured: configured,
+				active:     cfg.DefaultProvider == def.Name,
 				category:   "Local",
 			}
 			items = append(items, item)
@@ -220,6 +252,7 @@ func NewModel(cfg *config.Config, secretsMgr *secrets.Manager) *Model {
 			item := ProviderItem{
 				definition: def,
 				configured: true,
+				active:     cfg.DefaultProvider == p.Name,
 				category:   "Custom",
 			}
 			items = append(items, item)
@@ -227,12 +260,16 @@ func NewModel(cfg *config.Config, secretsMgr *secrets.Manager) *Model {
 		}
 	}
 
-	// Sort items: configured providers first, then by category, then by name
+	// Sort items: active first, then configured, then by category, then by name
 	sort.Slice(items, func(i, j int) bool {
 		itemI := items[i].(ProviderItem)
 		itemJ := items[j].(ProviderItem)
 
-		// Configured providers come first
+		// Active provider comes first
+		if itemI.active != itemJ.active {
+			return itemI.active && !itemJ.active
+		}
+		// Configured providers come next
 		if itemI.configured != itemJ.configured {
 			return itemI.configured && !itemJ.configured
 		}
@@ -252,6 +289,11 @@ func NewModel(cfg *config.Config, secretsMgr *secrets.Manager) *Model {
 		// Finally sort by name
 		return itemI.definition.Name < itemJ.definition.Name
 	})
+
+	// Add "Add New Provider" item at the end
+	addNewItem := ProviderItem{isAddNew: true}
+	items = append(items, addNewItem)
+	providerItems = append(providerItems, addNewItem)
 
 	// Create list
 	delegate := itemDelegate{styles: styles}

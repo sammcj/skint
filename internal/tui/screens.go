@@ -15,7 +15,7 @@ func (m *Model) viewMainScreen() string {
 	b.WriteString(header)
 	b.WriteString("\n\n")
 
-	// Subtitle
+	// Subtitle with legend
 	configuredCount := 0
 	for _, p := range m.cfg.Providers {
 		if !p.NeedsAPIKey() || p.GetAPIKey() != "" {
@@ -25,19 +25,15 @@ func (m *Model) viewMainScreen() string {
 	subtitle := m.styles.Subtitle.Render(fmt.Sprintf("Configure Providers (%d configured)", configuredCount))
 	b.WriteString(subtitle)
 	b.WriteString("\n")
+	legend := m.styles.Dimmed.Render(
+		m.styles.Success.Render("✓") + " configured  " +
+			m.styles.Info.Render("▶") + " active",
+	)
+	b.WriteString(legend)
+	b.WriteString("\n")
 
 	// List
 	b.WriteString(m.styles.List.Render(m.list.View()))
-	b.WriteString("\n")
-
-	// Custom providers section
-	customSection := m.styles.Box.Width(m.width - 8).Render(
-		m.styles.BoxTitle.Render("Add Custom Provider") + "\n" +
-			m.styles.Dimmed.Render("Press ") +
-			m.styles.Success.Render("c") +
-			m.styles.Dimmed.Render(" to configure a custom API endpoint (OpenAI or Anthropic compatible)"),
-	)
-	b.WriteString(customSection)
 	b.WriteString("\n")
 
 	// Help
@@ -50,7 +46,15 @@ func (m *Model) viewMainScreen() string {
 func (m *Model) viewProviderConfig() string {
 	var b strings.Builder
 
-	header := m.styles.Title.Render(fmt.Sprintf("  %s  ", m.selectedProvider.DisplayName))
+	// Check if editing or adding
+	existingProvider := m.cfg.GetProvider(m.selectedProvider.Name)
+	isEditing := existingProvider != nil
+
+	headerText := fmt.Sprintf("  Configure %s  ", m.selectedProvider.DisplayName)
+	if isEditing {
+		headerText = fmt.Sprintf("  Edit %s  ", m.selectedProvider.DisplayName)
+	}
+	header := m.styles.Title.Render(headerText)
 	b.WriteString(header)
 	b.WriteString("\n\n")
 
@@ -62,13 +66,65 @@ func (m *Model) viewProviderConfig() string {
 	b.WriteString(info)
 	b.WriteString("\n\n")
 
-	// Status
-	status := m.styles.Success.Render("✓ Ready to use")
-	b.WriteString(status)
-	b.WriteString("\n\n")
+	// Form fields
+	inputWidth := m.width - 20
+	if inputWidth < 30 {
+		inputWidth = 30
+	}
+
+	fields := []struct {
+		label string
+		value string
+		focus int
+		hint  string
+		req   bool
+	}{
+		{"Base URL", m.localProviderURL, 0, m.selectedProvider.BaseURL, true},
+		{"Auth Token", m.localProviderAuthToken, 1, "optional", false},
+		{"Model", m.localProviderModel, 2, "e.g., qwen3-coder", false},
+	}
+
+	for _, f := range fields {
+		labelStyle := m.styles.Label
+		if m.inputFocus == f.focus {
+			labelStyle = m.styles.InputPrompt
+		}
+
+		reqIndicator := ""
+		if f.req {
+			reqIndicator = m.styles.Error.Render("*")
+		}
+
+		b.WriteString(labelStyle.Render(f.label) + reqIndicator)
+		b.WriteString("\n")
+
+		displayValue := f.value
+		if displayValue == "" {
+			displayValue = f.hint
+		}
+
+		var inputLine string
+		if m.inputFocus == f.focus {
+			inputLine = m.styles.Input.Width(inputWidth).Render(displayValue)
+		} else {
+			if f.value == "" {
+				inputLine = m.styles.Dimmed.Render("  " + displayValue)
+			} else {
+				inputLine = m.styles.Value.Render("  " + displayValue)
+			}
+		}
+		b.WriteString(inputLine)
+		b.WriteString("\n\n")
+	}
+
+	// Error message
+	if m.inputError != "" {
+		b.WriteString(m.styles.Error.Render("✗ " + m.inputError))
+		b.WriteString("\n")
+	}
 
 	// Help
-	help := m.styles.Help.Render("enter: confirm • esc: back")
+	help := m.styles.Help.Render("↑/↓/tab: navigate • enter: save • esc: back")
 	b.WriteString(m.styles.Footer.Render(help))
 
 	return b.String()

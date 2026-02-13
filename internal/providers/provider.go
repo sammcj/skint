@@ -348,6 +348,14 @@ func (r *Registry) registerBuiltins() {
 			Type:        config.ProviderTypeBuiltin,
 		},
 		{
+			Name:        "openrouter",
+			DisplayName: "OpenRouter",
+			Description: "OpenRouter API gateway (access multiple models)",
+			Type:        config.ProviderTypeOpenRouter,
+			BaseURL:     "https://openrouter.ai/api",
+			KeyVar:      "OPENROUTER_API_KEY",
+		},
+		{
 			Name:          "zai",
 			DisplayName:   "Z.AI",
 			Description:   "Z.AI International (GLM-5)",

@@ -62,6 +62,9 @@ func (m *Model) updateModelPicker(msg tea.KeyMsg) bool {
 	filtered := m.filteredModels()
 
 	switch msg.Type {
+	case tea.KeyCtrlC:
+		// Don't consume Ctrl+C -- let the parent handler quit the app
+		return false
 	case tea.KeyEsc:
 		m.modelPickerOpen = false
 	case tea.KeyEnter:

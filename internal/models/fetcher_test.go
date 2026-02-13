@@ -75,9 +75,9 @@ func TestFetchModels_Ollama(t *testing.T) {
 			return
 		}
 		resp := map[string]any{
-			"models": []map[string]string{
-				{"name": "qwen3-coder:latest"},
-				{"name": "llama3.1:latest"},
+			"models": []map[string]any{
+				{"name": "qwen3-coder:latest", "modified_at": "2025-06-15T10:30:00.123456789Z"},
+				{"name": "llama3.1:latest", "modified_at": "2025-07-01T08:00:00.5Z"},
 			},
 		}
 		w.Header().Set("Content-Type", "application/json")
@@ -92,12 +92,19 @@ func TestFetchModels_Ollama(t *testing.T) {
 	if len(result.Models) != 2 {
 		t.Fatalf("got %d models, want 2", len(result.Models))
 	}
-	// Sorted
+	// Sorted newest first (llama3.1 has later modified_at)
 	if result.Models[0].ID != "llama3.1:latest" {
 		t.Errorf("model[0].ID = %q, want %q", result.Models[0].ID, "llama3.1:latest")
 	}
 	if result.Models[1].ID != "qwen3-coder:latest" {
 		t.Errorf("model[1].ID = %q, want %q", result.Models[1].ID, "qwen3-coder:latest")
+	}
+	// Verify timestamps were actually parsed
+	if result.Models[0].Created == 0 {
+		t.Error("expected non-zero Created timestamp for llama3.1")
+	}
+	if result.Models[1].Created == 0 {
+		t.Error("expected non-zero Created timestamp for qwen3-coder")
 	}
 }
 

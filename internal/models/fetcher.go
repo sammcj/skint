@@ -161,7 +161,7 @@ func fetchOllama(baseURL, _ string) FetchResult {
 	for _, m := range response.Models {
 		if m.Name != "" {
 			var created int64
-			if t, err := time.Parse(time.RFC3339, m.ModifiedAt); err == nil {
+			if t, err := time.Parse(time.RFC3339Nano, m.ModifiedAt); err == nil {
 				created = t.Unix()
 			}
 			models = append(models, ModelInfo{ID: m.Name, Created: created})

@@ -264,12 +264,19 @@ func NewModel(cfg *config.Config, secretsMgr *secrets.Manager) *Model {
 		}
 	}
 
-	// Sort items: active first, then configured, then by category, then by name
+	// Sort items: native always first, then active, then configured, then by category, then by name
 	sort.Slice(items, func(i, j int) bool {
 		itemI := items[i].(ProviderItem)
 		itemJ := items[j].(ProviderItem)
 
-		// Active provider comes first
+		// Native provider is always pinned to the top
+		iNative := itemI.definition != nil && itemI.definition.Name == "native"
+		jNative := itemJ.definition != nil && itemJ.definition.Name == "native"
+		if iNative != jNative {
+			return iNative
+		}
+
+		// Active provider comes next
 		if itemI.active != itemJ.active {
 			return itemI.active && !itemJ.active
 		}
@@ -429,10 +436,18 @@ func (m *Model) refreshProviderList() {
 		}
 	}
 
-	// Sort
+	// Sort: native always first, then active, then configured, then by category, then by name
 	sort.Slice(items, func(i, j int) bool {
 		itemI := items[i].(ProviderItem)
 		itemJ := items[j].(ProviderItem)
+
+		// Native provider is always pinned to the top
+		iNative := itemI.definition != nil && itemI.definition.Name == "native"
+		jNative := itemJ.definition != nil && itemJ.definition.Name == "native"
+		if iNative != jNative {
+			return iNative
+		}
+
 		if itemI.active != itemJ.active {
 			return itemI.active && !itemJ.active
 		}

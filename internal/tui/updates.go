@@ -613,8 +613,6 @@ func (m *Model) submitCustomProvider() (tea.Model, tea.Cmd) {
 	m.messageType = "success"
 	m.screen = ScreenSuccess
 	m.successOption = 0
-	// Don't quit - return to main screen so user can select it
-	m.resetCustomProviderForm()
 	return m, nil
 }
 
@@ -627,6 +625,15 @@ func (m *Model) updateSuccessScreen(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		providerName = m.customProviderName
 	}
 	hasLaunchOption := providerName != ""
+
+	// Helper: return to main screen, cleaning up any leftover form state
+	returnToMain := func() (tea.Model, tea.Cmd) {
+		m.refreshProviderList()
+		m.resetCustomProviderForm()
+		m.screen = ScreenMain
+		m.successOption = 0
+		return m, nil
+	}
 
 	switch msg.Type {
 	case tea.KeyCtrlC:
@@ -645,29 +652,18 @@ func (m *Model) updateSuccessScreen(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.done = true
 			return m, tea.Quit
 		}
-		// Continue (return to main screen or exit)
 		if m.done {
 			return m, tea.Quit
 		}
-		m.refreshProviderList()
-		m.screen = ScreenMain
-		m.successOption = 0
-		return m, nil
+		return returnToMain()
 	case tea.KeyEsc:
-		// Esc always goes back to main
-		m.refreshProviderList()
-		m.screen = ScreenMain
-		m.successOption = 0
-		return m, nil
+		return returnToMain()
 	default:
-		// Any other key: if no launch option, just continue
 		if !hasLaunchOption {
 			if m.done {
 				return m, tea.Quit
 			}
-			m.refreshProviderList()
-			m.screen = ScreenMain
-			return m, nil
+			return returnToMain()
 		}
 	}
 

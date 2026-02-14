@@ -22,6 +22,7 @@ install: build
 
 lint:
 	golangci-lint run ./...
+	gofmt -w -s .
 
 fmt:
 	go fmt ./...

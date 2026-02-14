@@ -309,10 +309,10 @@ func NewModel(cfg *config.Config, secretsMgr *secrets.Manager) *Model {
 	delegate := itemDelegate{styles: styles}
 	l := list.New(items, delegate, 0, 0)
 	l.Title = ""
+	l.SetShowTitle(false)
 	l.SetShowStatusBar(false)
 	l.SetFilteringEnabled(false)
 	l.SetShowHelp(false)
-	l.Styles.Title = styles.Title
 	l.KeyMap = list.KeyMap{
 		CursorUp:             key.NewBinding(key.WithKeys("up", "k")),
 		CursorDown:           key.NewBinding(key.WithKeys("down", "j")),

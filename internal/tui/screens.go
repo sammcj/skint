@@ -76,8 +76,7 @@ func (m *Model) renderModelPicker() string {
 
 // renderFormField renders a single form field with consistent container styling.
 // When focused: primary-coloured border. When unfocused: dim border container.
-// The valueOverride parameter is used when the display value differs from the stored value
-// (e.g., masked API keys). If empty, value is used as-is.
+// For masked fields (isMasked=true), if value equals hint the field is treated as empty.
 func (m *Model) renderFormField(label, value, hint string, focusIdx int, required, isMasked bool, inputWidth int) string {
 	var b strings.Builder
 
@@ -190,9 +189,10 @@ func (m *Model) viewProviderConfig() string {
 	if isEditing {
 		action = "Edit"
 	}
+	breadcrumbText := m.styles.Subtitle.UnsetMarginBottom().Render(
+		fmt.Sprintf("%s %s", action, m.selectedProvider.DisplayName))
 	header := m.styles.HeaderLine.Render("Skint") +
-		m.styles.HeaderSep.Render(" › ") +
-		m.styles.Subtitle.Render(fmt.Sprintf("%s %s", action, m.selectedProvider.DisplayName))
+		m.styles.HeaderSep.Render(" › ") + breadcrumbText
 	b.WriteString(header)
 	b.WriteString("\n")
 
@@ -297,9 +297,10 @@ func (m *Model) viewAPIKeyInput() string {
 	var b strings.Builder
 
 	// Compact header with breadcrumb
+	breadcrumbText := m.styles.Subtitle.UnsetMarginBottom().Render(
+		fmt.Sprintf("Configure %s", m.selectedProvider.DisplayName))
 	header := m.styles.HeaderLine.Render("Skint") +
-		m.styles.HeaderSep.Render(" › ") +
-		m.styles.Subtitle.Render(fmt.Sprintf("Configure %s", m.selectedProvider.DisplayName))
+		m.styles.HeaderSep.Render(" › ") + breadcrumbText
 	b.WriteString(header)
 	b.WriteString("\n")
 
@@ -453,9 +454,9 @@ func (m *Model) viewCustomProvider() string {
 	if isEditing {
 		action = "Edit Custom Provider"
 	}
+	breadcrumbText := m.styles.Subtitle.UnsetMarginBottom().Render(action)
 	header := m.styles.HeaderLine.Render("Skint") +
-		m.styles.HeaderSep.Render(" › ") +
-		m.styles.Subtitle.Render(action)
+		m.styles.HeaderSep.Render(" › ") + breadcrumbText
 	b.WriteString(header)
 	b.WriteString("\n")
 

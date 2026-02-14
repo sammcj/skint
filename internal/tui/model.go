@@ -301,7 +301,7 @@ func NewModel(cfg *config.Config, secretsMgr *secrets.Manager) *Model {
 	// Create list
 	delegate := itemDelegate{styles: styles}
 	l := list.New(items, delegate, 0, 0)
-	l.Title = "Select a Provider"
+	l.Title = ""
 	l.SetShowStatusBar(false)
 	l.SetFilteringEnabled(false)
 	l.SetShowHelp(false)

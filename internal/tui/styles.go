@@ -238,9 +238,8 @@ func DefaultStyles() Styles {
 		Padding(0, 2)
 
 	s.ButtonInactive = lipgloss.NewStyle().
-		Foreground(dim).
-		BorderStyle(lipgloss.RoundedBorder()).
-		BorderForeground(dim).
+		Foreground(lipgloss.Color("#9CA3AF")).
+		Background(bg).
 		Padding(0, 2)
 
 	// Inactive input (unfocused field with dim border)

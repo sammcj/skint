@@ -639,7 +639,7 @@ func (m *Model) updateSuccessScreen(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case tea.KeyCtrlC:
 		m.done = true
 		return m, tea.Quit
-	case tea.KeyUp, tea.KeyDown, tea.KeyTab:
+	case tea.KeyUp, tea.KeyDown, tea.KeyLeft, tea.KeyRight, tea.KeyTab:
 		if hasLaunchOption {
 			m.successOption = 1 - m.successOption // toggle between 0 and 1
 		}

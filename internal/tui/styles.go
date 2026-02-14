@@ -41,9 +41,24 @@ type Styles struct {
 	Category     lipgloss.Style
 
 	// Box styles
-	Box         lipgloss.Style
-	BoxTitle    lipgloss.Style
-	BoxContent  lipgloss.Style
+	Box        lipgloss.Style
+	BoxTitle   lipgloss.Style
+	BoxContent lipgloss.Style
+
+	// Button styles
+	ButtonActive   lipgloss.Style
+	ButtonInactive lipgloss.Style
+
+	// Form inactive input (unfocused fields with dim border)
+	InputInactive lipgloss.Style
+
+	// Picker box (model picker overlay)
+	PickerBox      lipgloss.Style
+	PickerBoxTitle lipgloss.Style
+
+	// Header line (compact single-line header)
+	HeaderLine lipgloss.Style
+	HeaderSep  lipgloss.Style
 
 	// Colors
 	PrimaryColor   lipgloss.Color
@@ -215,6 +230,44 @@ func DefaultStyles() Styles {
 	s.BoxContent = lipgloss.NewStyle().
 		Foreground(lipgloss.Color("#E5E7EB"))
 
+	// Button styles
+	s.ButtonActive = lipgloss.NewStyle().
+		Bold(true).
+		Foreground(lipgloss.Color("#FFFFFF")).
+		Background(primary).
+		Padding(0, 2)
+
+	s.ButtonInactive = lipgloss.NewStyle().
+		Foreground(dim).
+		BorderStyle(lipgloss.RoundedBorder()).
+		BorderForeground(dim).
+		Padding(0, 2)
+
+	// Inactive input (unfocused field with dim border)
+	s.InputInactive = lipgloss.NewStyle().
+		BorderStyle(lipgloss.NormalBorder()).
+		BorderForeground(dim).
+		Padding(0, 1)
+
+	// Picker box
+	s.PickerBox = lipgloss.NewStyle().
+		BorderStyle(lipgloss.RoundedBorder()).
+		BorderForeground(info).
+		Padding(0, 1).
+		MarginLeft(2)
+
+	s.PickerBoxTitle = lipgloss.NewStyle().
+		Foreground(info).
+		Bold(true)
+
+	// Header line
+	s.HeaderLine = lipgloss.NewStyle().
+		Bold(true).
+		Foreground(primary)
+
+	s.HeaderSep = lipgloss.NewStyle().
+		Foreground(dim)
+
 	return s
 }
 
@@ -231,6 +284,11 @@ func CompactStyles() Styles {
 		BorderForeground(s.PrimaryColor).
 		Padding(0, 1).
 		Margin(0)
+	s.PickerBox = lipgloss.NewStyle().
+		BorderStyle(lipgloss.RoundedBorder()).
+		BorderForeground(s.InfoColor).
+		Padding(0, 1).
+		MarginLeft(1)
 
 	return s
 }

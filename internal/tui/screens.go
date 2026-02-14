@@ -8,7 +8,7 @@ import (
 	"github.com/sammcj/skint/internal/config"
 )
 
-// renderModelPicker renders the model picker overlay.
+// renderModelPicker renders the model picker as a bordered overlay.
 func (m *Model) renderModelPicker() string {
 	if m.modelFetching {
 		return m.styles.Dimmed.Render("  Fetching models...")
@@ -22,16 +22,18 @@ func (m *Model) renderModelPicker() string {
 
 	filtered := m.filteredModels()
 	if len(filtered) == 0 {
-		return m.styles.Dimmed.Render("  No models match filter")
+		content := m.styles.Dimmed.Render("No models match filter")
+		pickerWidth := m.width - 16
+		pickerWidth = max(pickerWidth, 30)
+		return m.styles.PickerBox.Width(pickerWidth).Render(content) + "\n"
 	}
 
-	var b strings.Builder
+	var inner strings.Builder
 
 	// Calculate visible window
 	start := 0
 	end := len(filtered)
 	if end > maxPickerVisible {
-		// Keep selected item visible
 		if m.modelPickerIdx >= maxPickerVisible {
 			start = m.modelPickerIdx - maxPickerVisible + 1
 		}
@@ -39,9 +41,7 @@ func (m *Model) renderModelPicker() string {
 		if end > len(filtered) {
 			end = len(filtered)
 			start = end - maxPickerVisible
-			if start < 0 {
-				start = 0
-			}
+			start = max(start, 0)
 		}
 	}
 
@@ -49,17 +49,73 @@ func (m *Model) renderModelPicker() string {
 		mi := filtered[i]
 		label := mi.Label()
 		if i == m.modelPickerIdx {
-			b.WriteString(m.styles.ListSelected.Render("  > " + label))
+			inner.WriteString(m.styles.ListSelected.Render("> " + label))
 		} else {
-			b.WriteString(m.styles.Dimmed.Render("    " + label))
+			inner.WriteString(m.styles.Dimmed.Render("  " + label))
 		}
-		b.WriteString("\n")
+		if i < end-1 {
+			inner.WriteString("\n")
+		}
 	}
 
 	if len(filtered) > maxPickerVisible {
-		b.WriteString(m.styles.Dimmed.Render(fmt.Sprintf("  (%d/%d shown, type to filter)", min(maxPickerVisible, len(filtered)), len(filtered))))
-		b.WriteString("\n")
+		inner.WriteString("\n")
+		inner.WriteString(m.styles.Dimmed.Render(fmt.Sprintf("(%d/%d shown, type to filter)", min(maxPickerVisible, len(filtered)), len(filtered))))
 	}
+
+	// Title line
+	titleLine := m.styles.PickerBoxTitle.Render("Available Models")
+	if filterVal := m.getModelValue(); filterVal != "" {
+		titleLine += m.styles.Dimmed.Render(fmt.Sprintf(" [filter: %s]", filterVal))
+	}
+
+	pickerWidth := m.width - 16
+	pickerWidth = max(pickerWidth, 30)
+	return m.styles.PickerBox.Width(pickerWidth).Render(titleLine+"\n"+inner.String()) + "\n"
+}
+
+// renderFormField renders a single form field with consistent container styling.
+// When focused: primary-coloured border. When unfocused: dim border container.
+// The valueOverride parameter is used when the display value differs from the stored value
+// (e.g., masked API keys). If empty, value is used as-is.
+func (m *Model) renderFormField(label, value, hint string, focusIdx int, required, isMasked bool, inputWidth int) string {
+	var b strings.Builder
+
+	labelStyle := m.styles.Label
+	if m.inputFocus == focusIdx {
+		labelStyle = m.styles.InputPrompt
+	}
+
+	reqIndicator := ""
+	if required {
+		reqIndicator = m.styles.Error.Render("*")
+	}
+
+	b.WriteString(labelStyle.Render(label) + reqIndicator)
+	b.WriteString("\n")
+
+	displayValue := value
+	isEmpty := value == "" || (isMasked && value == hint)
+	if isEmpty {
+		displayValue = hint
+	}
+
+	if m.inputFocus == focusIdx {
+		// Focused: primary border
+		b.WriteString(m.styles.Input.Width(inputWidth).Render(displayValue))
+	} else {
+		// Unfocused: dim border container
+		if isEmpty {
+			b.WriteString(m.styles.InputInactive.Width(inputWidth).Render(
+				m.styles.Dimmed.Render(displayValue),
+			))
+		} else {
+			b.WriteString(m.styles.InputInactive.Width(inputWidth).Render(
+				m.styles.Value.Render(displayValue),
+			))
+		}
+	}
+	b.WriteString("\n")
 
 	return b.String()
 }
@@ -81,12 +137,7 @@ func (m *Model) modelPickerHelpHint() string {
 func (m *Model) viewMainScreen() string {
 	var b strings.Builder
 
-	// Header
-	header := m.styles.Title.Render("  Skint  ")
-	b.WriteString(header)
-	b.WriteString("\n\n")
-
-	// Subtitle with active provider and legend
+	// Compact single-line header
 	configuredCount := 0
 	for _, pi := range m.providerList {
 		if pi.configured {
@@ -94,11 +145,9 @@ func (m *Model) viewMainScreen() string {
 		}
 	}
 
-	// Show active provider in header — default to Claude Subscription when no custom provider is set
 	activeDisplayName := "Claude Subscription"
 	if m.cfg.DefaultProvider != "" {
 		activeDisplayName = m.cfg.DefaultProvider
-		// Use the display name if we can find the provider
 		for _, pi := range m.providerList {
 			if pi.definition != nil && pi.definition.Name == m.cfg.DefaultProvider {
 				activeDisplayName = pi.definition.DisplayName
@@ -106,26 +155,25 @@ func (m *Model) viewMainScreen() string {
 			}
 		}
 	}
-	activeText := lipgloss.NewStyle().Foreground(lipgloss.Color("#FFFFFF")).Bold(true).
-		Render(activeDisplayName)
-	subtitle := m.styles.Subtitle.Render(fmt.Sprintf("Providers (%d configured)", configuredCount)) +
-		"  " + m.styles.Dimmed.Render("active: ") + activeText
-	b.WriteString(subtitle)
-	b.WriteString("\n")
-	legend := m.styles.Dimmed.Render(
-		m.styles.Success.Render("✓") + " configured  " +
-			lipgloss.NewStyle().Foreground(lipgloss.Color("#FFFFFF")).Bold(true).Render("█") + " active",
-	)
-	b.WriteString(legend)
-	b.WriteString("\n")
+
+	sep := m.styles.HeaderSep.Render(" · ")
+	header := m.styles.HeaderLine.Render("Skint") +
+		sep + m.styles.Dimmed.Render("active: ") +
+		lipgloss.NewStyle().Foreground(lipgloss.Color("#FFFFFF")).Bold(true).Render(activeDisplayName) +
+		sep + m.styles.Dimmed.Render(fmt.Sprintf("%d configured", configuredCount)) +
+		sep + m.styles.Success.Render("✓") + m.styles.Dimmed.Render(" configured  ") +
+		lipgloss.NewStyle().Foreground(lipgloss.Color("#FFFFFF")).Bold(true).Render("█") + m.styles.Dimmed.Render(" active")
+	b.WriteString(header)
+	b.WriteString("\n\n")
 
 	// List
 	b.WriteString(m.styles.List.Render(m.list.View()))
 	b.WriteString("\n")
 
-	// Help
-	help := m.styles.Help.Render("↑/k ↓/j • enter: select • e: edit • a/c: add custom • u: launch claude • t: test • q: quit")
-	b.WriteString(m.styles.Footer.Render(help))
+	// Two-line help bar
+	navHelp := m.styles.Help.Render("↑/k ↓/j navigate  enter select  esc back")
+	actHelp := m.styles.Help.Render("e edit  a/c add custom  u launch  t test  q quit")
+	b.WriteString(m.styles.Footer.Render(navHelp + "\n" + actHelp))
 
 	return b.String()
 }
@@ -137,13 +185,16 @@ func (m *Model) viewProviderConfig() string {
 	existingProvider := m.cfg.GetProvider(m.selectedProvider.Name)
 	isEditing := existingProvider != nil
 
-	headerText := fmt.Sprintf("  Configure %s  ", m.selectedProvider.DisplayName)
+	// Compact header with breadcrumb
+	action := "Configure"
 	if isEditing {
-		headerText = fmt.Sprintf("  Edit %s  ", m.selectedProvider.DisplayName)
+		action = "Edit"
 	}
-	header := m.styles.Title.Render(headerText)
+	header := m.styles.HeaderLine.Render("Skint") +
+		m.styles.HeaderSep.Render(" › ") +
+		m.styles.Subtitle.Render(fmt.Sprintf("%s %s", action, m.selectedProvider.DisplayName))
 	b.WriteString(header)
-	b.WriteString("\n\n")
+	b.WriteString("\n")
 
 	// Show provider info
 	info := m.styles.Box.Width(m.width - 8).Render(
@@ -153,11 +204,9 @@ func (m *Model) viewProviderConfig() string {
 	b.WriteString(info)
 	b.WriteString("\n\n")
 
-	// Form fields
+	// Form fields with consistent containers
 	inputWidth := m.width - 20
-	if inputWidth < 30 {
-		inputWidth = 30
-	}
+	inputWidth = max(inputWidth, 30)
 
 	fields := []struct {
 		label string
@@ -172,36 +221,7 @@ func (m *Model) viewProviderConfig() string {
 	}
 
 	for _, f := range fields {
-		labelStyle := m.styles.Label
-		if m.inputFocus == f.focus {
-			labelStyle = m.styles.InputPrompt
-		}
-
-		reqIndicator := ""
-		if f.req {
-			reqIndicator = m.styles.Error.Render("*")
-		}
-
-		b.WriteString(labelStyle.Render(f.label) + reqIndicator)
-		b.WriteString("\n")
-
-		displayValue := f.value
-		if displayValue == "" {
-			displayValue = f.hint
-		}
-
-		var inputLine string
-		if m.inputFocus == f.focus {
-			inputLine = m.styles.Input.Width(inputWidth).Render(displayValue)
-		} else {
-			if f.value == "" {
-				inputLine = m.styles.Dimmed.Render("  " + displayValue)
-			} else {
-				inputLine = m.styles.Value.Render("  " + displayValue)
-			}
-		}
-		b.WriteString(inputLine)
-		b.WriteString("\n")
+		b.WriteString(m.renderFormField(f.label, f.value, f.hint, f.focus, f.req, false, inputWidth))
 
 		// Render model picker after the model field
 		if f.focus == 2 {
@@ -219,13 +239,17 @@ func (m *Model) viewProviderConfig() string {
 		b.WriteString("\n")
 	}
 
-	// Help
-	helpParts := "↑/↓/tab: navigate • enter: save • esc: back"
+	// Two-line help
+	navHelp := m.styles.Help.Render("↑/↓/tab navigate  enter save  esc back")
+	actHelp := ""
 	if hint := m.modelPickerHelpHint(); hint != "" {
-		helpParts += " • " + hint
+		actHelp = m.styles.Help.Render(hint)
 	}
-	help := m.styles.Help.Render(helpParts)
-	b.WriteString(m.styles.Footer.Render(help))
+	helpContent := navHelp
+	if actHelp != "" {
+		helpContent += "\n" + actHelp
+	}
+	b.WriteString(m.styles.Footer.Render(helpContent))
 
 	return b.String()
 }
@@ -272,9 +296,12 @@ Usage:
 func (m *Model) viewAPIKeyInput() string {
 	var b strings.Builder
 
-	header := m.styles.Title.Render(fmt.Sprintf("  Configure %s  ", m.selectedProvider.DisplayName))
+	// Compact header with breadcrumb
+	header := m.styles.HeaderLine.Render("Skint") +
+		m.styles.HeaderSep.Render(" › ") +
+		m.styles.Subtitle.Render(fmt.Sprintf("Configure %s", m.selectedProvider.DisplayName))
 	b.WriteString(header)
-	b.WriteString("\n\n")
+	b.WriteString("\n")
 
 	// Provider info
 	endpoint := m.selectedProvider.BaseURL
@@ -289,69 +316,27 @@ func (m *Model) viewAPIKeyInput() string {
 	b.WriteString("\n\n")
 
 	inputWidth := m.width - 20
-	if inputWidth < 30 {
-		inputWidth = 30
-	}
+	inputWidth = max(inputWidth, 30)
 
 	// API Key field
-	apiKeyLabel := m.styles.Label
-	if m.inputFocus == 0 {
-		apiKeyLabel = m.styles.InputPrompt
-	}
 	apiKeyRequired := !m.hasExistingKey
-	reqIndicator := ""
-	if apiKeyRequired {
-		reqIndicator = m.styles.Error.Render("*")
-	}
-	b.WriteString(apiKeyLabel.Render("API Key") + reqIndicator)
-	b.WriteString("\n")
-
 	emptyPlaceholder := "Type your API key..."
 	if m.hasExistingKey {
 		emptyPlaceholder = "Key saved - leave blank to keep, or type to replace"
 	}
-
 	masked := strings.Repeat("•", len(m.apiKeyInput))
 	if masked == "" {
 		masked = emptyPlaceholder
 	}
-	if m.inputFocus == 0 {
-		b.WriteString(m.styles.Input.Width(inputWidth).Render(masked))
-	} else if m.apiKeyInput == "" {
-		b.WriteString(m.styles.Dimmed.Render("  " + emptyPlaceholder))
-	} else {
-		b.WriteString(m.styles.Value.Render("  " + masked))
-	}
-	b.WriteString("\n\n")
+	b.WriteString(m.renderFormField("API Key", masked, emptyPlaceholder, 0, apiKeyRequired, true, inputWidth))
 
-	// Model field - required if provider has no default model or model mappings
+	// Model field
 	modelRequired := m.selectedProvider.DefaultModel == "" && len(m.selectedProvider.ModelMappings) == 0
-	modelLabel := m.styles.Label
-	if m.inputFocus == 1 {
-		modelLabel = m.styles.InputPrompt
-	}
 	modelHint := "e.g., anthropic/claude-sonnet-4"
 	if m.selectedProvider.DefaultModel != "" {
 		modelHint = m.selectedProvider.DefaultModel
 	}
-	modelReqIndicator := ""
-	if modelRequired {
-		modelReqIndicator = m.styles.Error.Render("*")
-	}
-	b.WriteString(modelLabel.Render("Model") + modelReqIndicator)
-	b.WriteString("\n")
-	displayModel := m.modelInput
-	if displayModel == "" {
-		displayModel = modelHint
-	}
-	if m.inputFocus == 1 {
-		b.WriteString(m.styles.Input.Width(inputWidth).Render(displayModel))
-	} else if m.modelInput == "" {
-		b.WriteString(m.styles.Dimmed.Render("  " + displayModel))
-	} else {
-		b.WriteString(m.styles.Value.Render("  " + displayModel))
-	}
-	b.WriteString("\n")
+	b.WriteString(m.renderFormField("Model", m.modelInput, modelHint, 1, modelRequired, false, inputWidth))
 
 	// Model picker
 	pickerView := m.renderModelPicker()
@@ -366,13 +351,17 @@ func (m *Model) viewAPIKeyInput() string {
 		b.WriteString("\n")
 	}
 
-	// Help
-	helpParts := "↑/↓/tab: navigate • enter: save • esc: cancel"
+	// Two-line help
+	navHelp := m.styles.Help.Render("↑/↓/tab navigate  enter save  esc cancel")
+	actHelp := ""
 	if hint := m.modelPickerHelpHint(); hint != "" {
-		helpParts += " • " + hint
+		actHelp = m.styles.Help.Render(hint)
 	}
-	help := m.styles.Help.Render(helpParts)
-	b.WriteString(m.styles.Footer.Render(help))
+	helpContent := navHelp
+	if actHelp != "" {
+		helpContent += "\n" + actHelp
+	}
+	b.WriteString(m.styles.Footer.Render(helpContent))
 
 	return b.String()
 }
@@ -380,7 +369,10 @@ func (m *Model) viewAPIKeyInput() string {
 func (m *Model) viewSuccess() string {
 	var b strings.Builder
 
-	header := m.styles.Title.Render("  Success!  ")
+	// Compact header
+	header := m.styles.HeaderLine.Render("Skint") +
+		m.styles.HeaderSep.Render(" › ") +
+		m.styles.Success.Render("Success")
 	b.WriteString(header)
 	b.WriteString("\n\n")
 
@@ -392,7 +384,6 @@ func (m *Model) viewSuccess() string {
 	if m.selectedProvider != nil {
 		providerName = m.selectedProvider.Name
 	} else if m.customProviderName != "" {
-		// Custom provider was just created
 		providerName = m.customProviderName
 	}
 	if providerName != "" {
@@ -404,31 +395,29 @@ func (m *Model) viewSuccess() string {
 		b.WriteString(next)
 		b.WriteString("\n\n")
 
-		// Action buttons
-		continueLabel := "  Continue  "
-		launchLabel := fmt.Sprintf("  Launch Claude with %s  ", providerName)
+		// Styled action buttons
+		var continueBtn, launchBtn string
 		if m.successOption == 0 {
-			continueLabel = m.styles.ListSelected.Render(continueLabel)
-			launchLabel = m.styles.Dimmed.Render(launchLabel)
+			continueBtn = m.styles.ButtonActive.Render("Continue")
+			launchBtn = m.styles.ButtonInactive.Render(fmt.Sprintf("Launch Claude with %s", providerName))
 		} else {
-			continueLabel = m.styles.Dimmed.Render(continueLabel)
-			launchLabel = m.styles.ListSelected.Render(launchLabel)
+			continueBtn = m.styles.ButtonInactive.Render("Continue")
+			launchBtn = m.styles.ButtonActive.Render(fmt.Sprintf("Launch Claude with %s", providerName))
 		}
-		b.WriteString(continueLabel + "  " + launchLabel)
+		b.WriteString(continueBtn + "  " + launchBtn)
 		b.WriteString("\n\n")
 	}
 
 	// Help
 	if providerName != "" {
-		help := m.styles.Help.Render("↑/↓: select • enter: confirm • esc: back")
+		help := m.styles.Help.Render("←/→ select  enter confirm  esc back")
 		b.WriteString(m.styles.Footer.Render(help))
 	} else {
 		helpText := "press any key to continue..."
 		if m.done {
 			helpText = "press any key to exit..."
 		}
-		help := m.styles.Help.Render(helpText)
-		b.WriteString(m.styles.Footer.Render(help))
+		b.WriteString(m.styles.Footer.Render(m.styles.Help.Render(helpText)))
 	}
 
 	return b.String()
@@ -437,16 +426,17 @@ func (m *Model) viewSuccess() string {
 func (m *Model) viewError() string {
 	var b strings.Builder
 
-	header := m.styles.Title.Render("  Error  ")
+	// Compact header
+	header := m.styles.HeaderLine.Render("Skint") +
+		m.styles.HeaderSep.Render(" › ") +
+		m.styles.Error.Render("Error")
 	b.WriteString(header)
 	b.WriteString("\n\n")
 
 	b.WriteString(m.styles.Error.Render("✗ " + m.message))
 	b.WriteString("\n\n")
 
-	// Help
-	help := m.styles.Help.Render("press any key to continue...")
-	b.WriteString(m.styles.Footer.Render(help))
+	b.WriteString(m.styles.Footer.Render(m.styles.Help.Render("press any key to continue...")))
 
 	return b.String()
 }
@@ -458,11 +448,14 @@ func (m *Model) viewCustomProvider() string {
 	existingProvider := m.cfg.GetProvider(m.customProviderName)
 	isEditing := existingProvider != nil
 
-	headerText := "  Add Custom Provider  "
+	// Compact header with breadcrumb
+	action := "Add Custom Provider"
 	if isEditing {
-		headerText = "  Edit Custom Provider  "
+		action = "Edit Custom Provider"
 	}
-	header := m.styles.Title.Render(headerText)
+	header := m.styles.HeaderLine.Render("Skint") +
+		m.styles.HeaderSep.Render(" › ") +
+		m.styles.Subtitle.Render(action)
 	b.WriteString(header)
 	b.WriteString("\n")
 
@@ -478,11 +471,9 @@ func (m *Model) viewCustomProvider() string {
 	b.WriteString(instructions)
 	b.WriteString("\n\n")
 
-	// Form fields with consistent layout
+	// Form fields with consistent containers
 	inputWidth := m.width - 20
-	if inputWidth < 30 {
-		inputWidth = 30
-	}
+	inputWidth = max(inputWidth, 30)
 
 	// Check if provider has saved API key for hint text
 	hasSavedKey := existingProvider != nil && existingProvider.APIKeyRef != ""
@@ -492,62 +483,30 @@ func (m *Model) viewCustomProvider() string {
 		apiKeyHint = "(saved - type to change)"
 	}
 
+	// Mask API key value for display
+	maskedAPIKey := m.apiKeyInput
+	if maskedAPIKey != "" {
+		maskedAPIKey = strings.Repeat("•", len(maskedAPIKey))
+	}
+
 	fields := []struct {
-		label   string
-		value   string
-		focus   int
-		hint    string
-		mask    bool
-		req     bool
+		label    string
+		value    string
+		focus    int
+		hint     string
+		isMasked bool
+		req      bool
 	}{
 		{"Name", m.customProviderName, 0, "lowercase-id", false, true},
 		{"Display Name", m.customProviderDisplay, 1, "optional", false, false},
 		{"Base URL", m.customProviderURL, 2, "https://api.example.com", false, true},
-		{"API Key", m.apiKeyInput, 3, apiKeyHint, true, false},
+		{"API Key", maskedAPIKey, 3, apiKeyHint, true, false},
 		{"Model", m.customProviderModel, 4, "e.g., gpt-4o, claude-3-sonnet", false, true},
 		{"API Type", m.customProviderAPIType, 5, "↑/↓ to change", false, true},
 	}
 
 	for _, f := range fields {
-		labelStyle := m.styles.Label
-		if m.inputFocus == f.focus {
-			labelStyle = m.styles.InputPrompt
-		}
-
-		// Required indicator
-		reqIndicator := ""
-		if f.req {
-			reqIndicator = m.styles.Error.Render("*")
-		}
-
-		// Label line
-		b.WriteString(labelStyle.Render(f.label) + reqIndicator)
-		b.WriteString("\n")
-
-		// Display value
-		displayValue := f.value
-		if f.mask && displayValue != "" {
-			displayValue = strings.Repeat("•", len(displayValue))
-		}
-		if displayValue == "" {
-			displayValue = f.hint
-		}
-
-		// Input line with consistent styling
-		var inputLine string
-		if m.inputFocus == f.focus {
-			// Active field with border
-			inputLine = m.styles.Input.Width(inputWidth).Render(displayValue)
-		} else {
-			// Inactive field with dimmed styling
-			if f.value == "" {
-				inputLine = m.styles.Dimmed.Render("  " + displayValue)
-			} else {
-				inputLine = m.styles.Value.Render("  " + displayValue)
-			}
-		}
-		b.WriteString(inputLine)
-		b.WriteString("\n")
+		b.WriteString(m.renderFormField(f.label, f.value, f.hint, f.focus, f.req, f.isMasked, inputWidth))
 
 		// Render model picker after the model field
 		if f.focus == 4 {
@@ -556,7 +515,6 @@ func (m *Model) viewCustomProvider() string {
 				b.WriteString(pickerView)
 			}
 		}
-		b.WriteString("\n")
 	}
 
 	// API Type explanation
@@ -575,13 +533,17 @@ func (m *Model) viewCustomProvider() string {
 
 	b.WriteString("\n")
 
-	// Help
-	helpParts := "↑/↓/tab: navigate • enter: submit • esc: cancel"
+	// Two-line help
+	navHelp := m.styles.Help.Render("↑/↓/tab navigate  enter submit  esc cancel")
+	actHelp := ""
 	if hint := m.modelPickerHelpHint(); hint != "" {
-		helpParts += " • " + hint
+		actHelp = m.styles.Help.Render(hint)
 	}
-	help := m.styles.Help.Render(helpParts)
-	b.WriteString(m.styles.Footer.Render(help))
+	helpContent := navHelp
+	if actHelp != "" {
+		helpContent += "\n" + actHelp
+	}
+	b.WriteString(m.styles.Footer.Render(helpContent))
 
 	return b.String()
 }

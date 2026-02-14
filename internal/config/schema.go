@@ -39,7 +39,7 @@ type Provider struct {
 	// Use EffectiveModel() to get whichever is set.
 	DefaultModel  string            `yaml:"default_model,omitempty" mapstructure:"default_model"`
 	Model         string            `yaml:"model,omitempty" mapstructure:"model"`
-	ModelMappings  map[string]string `yaml:"model_mappings,omitempty" mapstructure:"model_mappings"`
+	ModelMappings map[string]string `yaml:"model_mappings,omitempty" mapstructure:"model_mappings"`
 
 	// Local provider specific
 	AuthToken string `yaml:"auth_token,omitempty" mapstructure:"auth_token"`

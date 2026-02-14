@@ -33,22 +33,22 @@ type ColorScheme struct {
 
 // Symbols holds the symbol characters
 type Symbols struct {
-	OK        string
-	Error     string
-	Warning   string
-	Info      string
-	Arrow     string
-	Check     string
-	Uncheck   string
-	Bullet    string
-	Ellipsis  string
-	Spinner   []string
-	BoxTL     string
-	BoxTR     string
-	BoxBL     string
-	BoxBR     string
-	BoxH      string
-	BoxV      string
+	OK       string
+	Error    string
+	Warning  string
+	Info     string
+	Arrow    string
+	Check    string
+	Uncheck  string
+	Bullet   string
+	Ellipsis string
+	Spinner  []string
+	BoxTL    string
+	BoxTR    string
+	BoxBL    string
+	BoxBR    string
+	BoxH     string
+	BoxV     string
 }
 
 var (

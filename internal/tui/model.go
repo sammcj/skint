@@ -42,11 +42,11 @@ const apiKeyFormFieldCount = 2
 // Model is the main TUI model
 type Model struct {
 	// State
-	screen      Screen
-	styles      Styles
-	width       int
-	height      int
-	compact     bool
+	screen  Screen
+	styles  Styles
+	width   int
+	height  int
+	compact bool
 
 	// Data
 	cfg        *config.Config
@@ -66,11 +66,11 @@ type Model struct {
 	hasExistingKey   bool
 
 	// Custom provider form fields
-	customProviderName     string
-	customProviderDisplay  string
-	customProviderURL      string
-	customProviderModel    string
-	customProviderAPIType  string // "anthropic" or "openai"
+	customProviderName    string
+	customProviderDisplay string
+	customProviderURL     string
+	customProviderModel   string
+	customProviderAPIType string // "anthropic" or "openai"
 
 	// Local provider form fields
 	localProviderURL       string
@@ -329,13 +329,13 @@ func NewModel(cfg *config.Config, secretsMgr *secrets.Manager) *Model {
 	}
 
 	return &Model{
-		screen:           ScreenMain,
-		styles:           styles,
-		cfg:              cfg,
-		registry:         registry,
-		secretsMgr:       secretsMgr,
-		list:             l,
-		providerList:     providerItems,
+		screen:       ScreenMain,
+		styles:       styles,
+		cfg:          cfg,
+		registry:     registry,
+		secretsMgr:   secretsMgr,
+		list:         l,
+		providerList: providerItems,
 	}
 }
 

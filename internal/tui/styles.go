@@ -7,11 +7,11 @@ import (
 // Styles holds all the Lipgloss styles for the TUI
 type Styles struct {
 	// Container styles
-	App       lipgloss.Style
-	Header    lipgloss.Style
-	Footer    lipgloss.Style
-	Content   lipgloss.Style
-	Help      lipgloss.Style
+	App     lipgloss.Style
+	Header  lipgloss.Style
+	Footer  lipgloss.Style
+	Content lipgloss.Style
+	Help    lipgloss.Style
 
 	// Component styles
 	Title       lipgloss.Style

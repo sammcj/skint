@@ -47,7 +47,7 @@ func TestBuiltinProvider_GetEnvVars(t *testing.T) {
 			want: map[string]string{
 				"ANTHROPIC_BASE_URL":             "https://example.com",
 				"ANTHROPIC_AUTH_TOKEN":           "token123",
-				"ANTHROPIC_MODEL":               "test-model",
+				"ANTHROPIC_MODEL":                "test-model",
 				"ANTHROPIC_DEFAULT_HAIKU_MODEL":  "h",
 				"ANTHROPIC_DEFAULT_SONNET_MODEL": "s",
 				"ANTHROPIC_DEFAULT_OPUS_MODEL":   "o",
@@ -63,9 +63,9 @@ func TestBuiltinProvider_GetEnvVars(t *testing.T) {
 				modelMappings: map[string]string{"small": "kimi-k2.5"},
 			}},
 			want: map[string]string{
-				"ANTHROPIC_BASE_URL":        "https://api.kimi.example",
-				"ANTHROPIC_AUTH_TOKEN":      "key",
-				"ANTHROPIC_MODEL":          "kimi-k2.5",
+				"ANTHROPIC_BASE_URL":         "https://api.kimi.example",
+				"ANTHROPIC_AUTH_TOKEN":       "key",
+				"ANTHROPIC_MODEL":            "kimi-k2.5",
 				"ANTHROPIC_SMALL_FAST_MODEL": "kimi-k2.5",
 			},
 		},
@@ -200,7 +200,7 @@ func TestLocalProvider_GetEnvVars(t *testing.T) {
 				"ANTHROPIC_BASE_URL":   "http://localhost:1234",
 				"ANTHROPIC_AUTH_TOKEN": "lmstudio",
 				"ANTHROPIC_API_KEY":    "",
-				"ANTHROPIC_MODEL":     "qwen2.5-coder",
+				"ANTHROPIC_MODEL":      "qwen2.5-coder",
 			},
 		},
 		{
@@ -243,7 +243,7 @@ func TestCustomProvider_GetEnvVars(t *testing.T) {
 			want: map[string]string{
 				"OPENAI_BASE_URL": "https://api.example.com",
 				"OPENAI_API_KEY":  "key123",
-				"OPENAI_MODEL":   "gpt-4",
+				"OPENAI_MODEL":    "gpt-4",
 			},
 		},
 		{
@@ -260,7 +260,7 @@ func TestCustomProvider_GetEnvVars(t *testing.T) {
 			want: map[string]string{
 				"ANTHROPIC_BASE_URL":   "https://custom.anthropic.example",
 				"ANTHROPIC_AUTH_TOKEN": "sk-ant-custom",
-				"ANTHROPIC_MODEL":     "claude-3-sonnet",
+				"ANTHROPIC_MODEL":      "claude-3-sonnet",
 			},
 		},
 		{
@@ -277,7 +277,7 @@ func TestCustomProvider_GetEnvVars(t *testing.T) {
 			want: map[string]string{
 				"ANTHROPIC_BASE_URL":   "https://fallback.example",
 				"ANTHROPIC_AUTH_TOKEN": "fb-key",
-				"ANTHROPIC_MODEL":     "fb-model",
+				"ANTHROPIC_MODEL":      "fb-model",
 			},
 		},
 		{
@@ -302,10 +302,10 @@ func TestCustomProvider_GetEnvVars(t *testing.T) {
 
 func TestFromConfig(t *testing.T) {
 	tests := []struct {
-		name         string
-		cfg          *config.Provider
-		wantType     string
-		wantErr      bool
+		name          string
+		cfg           *config.Provider
+		wantType      string
+		wantErr       bool
 		wantErrSubstr string
 	}{
 		{
@@ -364,7 +364,7 @@ func TestFromConfig(t *testing.T) {
 				Name: "bogus",
 				Type: "imaginary",
 			},
-			wantErr:      true,
+			wantErr:       true,
 			wantErrSubstr: "unknown provider type",
 		},
 	}

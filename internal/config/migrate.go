@@ -111,12 +111,12 @@ func (m *Migration) LoadSecrets() (map[string]string, error) {
 func (m *Migration) unescape(s string) string {
 	// Simple unescaping for common cases
 	replacements := map[string]string{
-		`\\`:   `\`,
-		`\"`:   `"`,
-		`\'`:   `'`,
-		`\n`:   "\n",
-		`\t`:   "\t",
-		`\$`:   `$`,
+		`\\`: `\`,
+		`\"`: `"`,
+		`\'`: `'`,
+		`\n`: "\n",
+		`\t`: "\t",
+		`\$`: `$`,
 	}
 
 	for old, new := range replacements {

@@ -213,4 +213,3 @@ exec claude "$@"
 
 	return nil
 }
-

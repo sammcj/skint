@@ -1,11 +1,12 @@
 package models
 
 import (
+	"cmp"
 	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
-	"sort"
+	"slices"
 	"strings"
 	"time"
 )
@@ -230,12 +231,12 @@ func sortModels(models []ModelInfo) {
 		}
 	}
 
-	sort.Slice(models, func(i, j int) bool {
+	slices.SortFunc(models, func(a, b ModelInfo) int {
 		if hasTimestamps {
-			if models[i].Created != models[j].Created {
-				return models[i].Created > models[j].Created // newest first
+			if a.Created != b.Created {
+				return cmp.Compare(b.Created, a.Created) // newest first
 			}
 		}
-		return models[i].ID < models[j].ID
+		return cmp.Compare(a.ID, b.ID)
 	})
 }

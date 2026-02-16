@@ -20,9 +20,7 @@ func envEqual(t *testing.T, got, want []string) {
 	}
 }
 
-func TestRemoveEnvVars(t *testing.T) {
-	l := &Launcher{}
-
+func TestFilterEnvVars(t *testing.T) {
 	tests := []struct {
 		name string
 		env  []string
@@ -105,7 +103,7 @@ func TestRemoveEnvVars(t *testing.T) {
 				orig = slices.Clone(tc.env)
 			}
 
-			got := l.removeEnvVars(tc.env, tc.vars...)
+			got := FilterEnvVars(tc.env, tc.vars...)
 
 			envEqual(t, got, tc.want)
 
@@ -114,5 +112,32 @@ func TestRemoveEnvVars(t *testing.T) {
 				envEqual(t, tc.env, orig)
 			}
 		})
+	}
+}
+
+func TestConflictingEnvVars(t *testing.T) {
+	// Verify the shared list contains the expected variables.
+	expected := map[string]bool{
+		"ANTHROPIC_BASE_URL":             true,
+		"ANTHROPIC_AUTH_TOKEN":           true,
+		"ANTHROPIC_API_KEY":              true,
+		"ANTHROPIC_MODEL":                true,
+		"ANTHROPIC_DEFAULT_HAIKU_MODEL":  true,
+		"ANTHROPIC_DEFAULT_SONNET_MODEL": true,
+		"ANTHROPIC_DEFAULT_OPUS_MODEL":   true,
+		"ANTHROPIC_SMALL_FAST_MODEL":     true,
+		"OPENAI_BASE_URL":                true,
+		"OPENAI_API_KEY":                 true,
+		"OPENAI_MODEL":                   true,
+	}
+
+	if len(ConflictingEnvVars) != len(expected) {
+		t.Fatalf("ConflictingEnvVars has %d entries, expected %d", len(ConflictingEnvVars), len(expected))
+	}
+
+	for _, v := range ConflictingEnvVars {
+		if !expected[v] {
+			t.Errorf("unexpected entry in ConflictingEnvVars: %s", v)
+		}
 	}
 }

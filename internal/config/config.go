@@ -6,7 +6,6 @@ import (
 	"path/filepath"
 	"runtime"
 
-	"github.com/mitchellh/go-homedir"
 	"gopkg.in/yaml.v3"
 )
 
@@ -182,7 +181,7 @@ func getConfigDir() (string, error) {
 	}
 
 	// Fall back to ~/.config
-	home, err := homedir.Dir()
+	home, err := os.UserHomeDir()
 	if err != nil {
 		return "", fmt.Errorf("failed to get home directory: %w", err)
 	}
@@ -198,7 +197,7 @@ func GetDataDir() (string, error) {
 	}
 
 	// Fall back to ~/.local/share
-	home, err := homedir.Dir()
+	home, err := os.UserHomeDir()
 	if err != nil {
 		return "", fmt.Errorf("failed to get home directory: %w", err)
 	}
@@ -214,7 +213,7 @@ func GetCacheDir() (string, error) {
 	}
 
 	// Fall back to ~/.cache
-	home, err := homedir.Dir()
+	home, err := os.UserHomeDir()
 	if err != nil {
 		return "", fmt.Errorf("failed to get home directory: %w", err)
 	}
@@ -229,7 +228,7 @@ func GetBinDir() (string, error) {
 		return bin, nil
 	}
 
-	home, err := homedir.Dir()
+	home, err := os.UserHomeDir()
 	if err != nil {
 		return "", fmt.Errorf("failed to get home directory: %w", err)
 	}

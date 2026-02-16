@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
-	"strings"
 
+	"github.com/sammcj/skint/internal/launcher"
 	"github.com/sammcj/skint/internal/providers"
 	"github.com/sammcj/skint/internal/ui"
 	"github.com/spf13/cobra"
@@ -64,14 +64,8 @@ func runExec(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("failed to create provider %s: %w", providerName, err)
 	}
 
-	// Build environment
-	env := os.Environ()
-
-	// Remove existing provider variables to avoid conflicts
-	env = filterEnvVars(env, "ANTHROPIC_BASE_URL", "ANTHROPIC_AUTH_TOKEN",
-		"ANTHROPIC_API_KEY", "ANTHROPIC_MODEL", "ANTHROPIC_DEFAULT_HAIKU_MODEL",
-		"ANTHROPIC_DEFAULT_SONNET_MODEL", "ANTHROPIC_DEFAULT_OPUS_MODEL",
-		"ANTHROPIC_SMALL_FAST_MODEL", "OPENAI_BASE_URL", "OPENAI_API_KEY", "OPENAI_MODEL")
+	// Build environment -- remove conflicting vars first
+	env := launcher.FilterEnvVars(os.Environ(), launcher.ConflictingEnvVars...)
 
 	// Add provider-specific variables
 	providerVars := provider.GetEnvVars()
@@ -104,26 +98,4 @@ func runExec(cmd *cobra.Command, args []string) error {
 	execCmd.Stderr = os.Stderr
 
 	return execCmd.Run()
-}
-
-// filterEnvVars removes specified environment variables from an env slice
-func filterEnvVars(env []string, vars ...string) []string {
-	varNames := make(map[string]bool)
-	for _, v := range vars {
-		varNames[v] = true
-	}
-
-	var result []string
-	for _, e := range env {
-		name, _, ok := strings.Cut(e, "=")
-		if !ok {
-			result = append(result, e)
-			continue
-		}
-		if !varNames[name] {
-			result = append(result, e)
-		}
-	}
-
-	return result
 }

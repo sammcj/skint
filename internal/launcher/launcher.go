@@ -6,7 +6,6 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
-	"strings"
 	"syscall"
 
 	"github.com/sammcj/skint/internal/config"
@@ -59,17 +58,8 @@ func (l *Launcher) Launch(provider providers.Provider, args []string) error {
 
 // buildEnvironment builds the environment variables for Claude
 func (l *Launcher) buildEnvironment(provider providers.Provider) []string {
-	// Start with current environment
-	env := os.Environ()
-
-	// Remove existing Anthropic variables to avoid conflicts
-	env = l.removeEnvVars(env, "ANTHROPIC_BASE_URL", "ANTHROPIC_AUTH_TOKEN",
-		"ANTHROPIC_API_KEY", "ANTHROPIC_MODEL", "ANTHROPIC_DEFAULT_HAIKU_MODEL",
-		"ANTHROPIC_DEFAULT_SONNET_MODEL", "ANTHROPIC_DEFAULT_OPUS_MODEL",
-		"ANTHROPIC_SMALL_FAST_MODEL")
-
-	// Remove OpenAI variables to avoid conflicts with custom OpenAI providers
-	env = l.removeEnvVars(env, "OPENAI_BASE_URL", "OPENAI_API_KEY", "OPENAI_MODEL")
+	// Start with current environment, remove conflicting vars
+	env := FilterEnvVars(os.Environ(), ConflictingEnvVars...)
 
 	// Add provider-specific variables
 	providerVars := provider.GetEnvVars()
@@ -78,29 +68,6 @@ func (l *Launcher) buildEnvironment(provider providers.Provider) []string {
 	}
 
 	return env
-}
-
-// removeEnvVars removes specified environment variables
-func (l *Launcher) removeEnvVars(env []string, vars ...string) []string {
-	varNames := make(map[string]bool)
-	for _, v := range vars {
-		varNames[v] = true
-	}
-
-	var result []string
-	for _, e := range env {
-		name, _, ok := strings.Cut(e, "=")
-		if !ok {
-			// Entry without '=' -- preserve it
-			result = append(result, e)
-			continue
-		}
-		if !varNames[name] {
-			result = append(result, e)
-		}
-	}
-
-	return result
 }
 
 // showBanner displays the Skint banner

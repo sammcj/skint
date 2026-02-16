@@ -2,6 +2,7 @@ package providers
 
 import (
 	"fmt"
+	"sync"
 
 	"github.com/sammcj/skint/internal/config"
 )
@@ -298,13 +299,21 @@ type Definition struct {
 	APIType       string // For custom providers: "anthropic" or "openai"
 }
 
-// NewRegistry creates a new provider registry with built-in definitions
+var (
+	registryOnce      sync.Once
+	registrySingleton *Registry
+)
+
+// NewRegistry returns the shared provider registry with built-in definitions.
+// The registry is created once and cached; subsequent calls return the same instance.
 func NewRegistry() *Registry {
-	r := &Registry{
-		definitions: make(map[string]*Definition),
-	}
-	r.registerBuiltins()
-	return r
+	registryOnce.Do(func() {
+		registrySingleton = &Registry{
+			definitions: make(map[string]*Definition),
+		}
+		registrySingleton.registerBuiltins()
+	})
+	return registrySingleton
 }
 
 // Get retrieves a provider definition by name

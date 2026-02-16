@@ -50,6 +50,7 @@ Skint is a CLI launcher that wraps Claude Code with different LLM provider confi
 - `config.Provider.IsConfigured()` checks `APIKeyRef` (persisted) rather than `resolvedAPIKey` (runtime-only) - always prefer this over checking `GetAPIKey()`
 - Provider categories in TUI: Native (`native`, `anthropic`), International, Local. No China category.
 - The `anthropic` provider uses `KeyEnvVar: "ANTHROPIC_API_KEY"` and has no base URL (Claude Code defaults to api.anthropic.com)
+- After making anything other than minor changes update `CHANGELOG.md` with a concise bullet-point summary of changes made.
 </CONVENTIONS>
 
 <GOTCHAS>

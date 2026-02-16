@@ -52,10 +52,21 @@ type Symbols struct {
 }
 
 var (
-	// Colors is the global color scheme
-	Colors *ColorScheme
-	// Sym is the global symbols
-	Sym *Symbols
+	// Colors is the global color scheme.
+	// Initialised with safe defaults so callers don't panic if Init() hasn't run.
+	Colors = &ColorScheme{
+		Red: color.New(), Green: color.New(), Yellow: color.New(),
+		Blue: color.New(), Cyan: color.New(), Magenta: color.New(),
+		White: color.New(), Black: color.New(), Bold: color.New(), Dim: color.New(),
+	}
+	// Sym is the global symbols.
+	// Initialised with ASCII fallbacks so callers don't panic if Init() hasn't run.
+	Sym = &Symbols{
+		OK: "[OK]", Error: "[X]", Warning: "[!]", Info: ">",
+		Arrow: "->", Check: "[x]", Uncheck: "[ ]", Bullet: "*",
+		Ellipsis: "...", Spinner: []string{"-", "\\", "|", "/"},
+		BoxTL: "+", BoxTR: "+", BoxBL: "+", BoxBR: "+", BoxH: "-", BoxV: "|",
+	}
 )
 
 // Init initializes the UI with the given config
@@ -144,7 +155,7 @@ func Success(format string, a ...interface{}) {
 		Colors.Green.Printf("%s ", Sym.OK)
 	}
 	color.White(format, a...)
-	println()
+	fmt.Println()
 }
 
 // Error prints an error message

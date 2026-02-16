@@ -68,7 +68,13 @@ func selectStrategy(baseURL, providerName string) fetchFunc {
 
 // fetchOpenAICompatible fetches models from an OpenAI-compatible /v1/models endpoint.
 func fetchOpenAICompatible(baseURL, apiKey string) FetchResult {
-	url := strings.TrimRight(baseURL, "/") + "/v1/models"
+	trimmed := strings.TrimRight(baseURL, "/")
+	var url string
+	if strings.HasSuffix(trimmed, "/v1") {
+		url = trimmed + "/models"
+	} else {
+		url = trimmed + "/v1/models"
+	}
 	req, err := http.NewRequest(http.MethodGet, url, nil)
 	if err != nil {
 		return FetchResult{Err: fmt.Errorf("creating request: %w", err)}

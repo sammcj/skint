@@ -205,3 +205,30 @@ func TestModelInfo_Label(t *testing.T) {
 		}
 	}
 }
+
+func TestFetchModels_BaseURLWithV1Suffix(t *testing.T) {
+	// When the base URL already ends with /v1 (e.g. NVIDIA NIM), the fetcher
+	// should not double up the /v1 prefix.
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/v1/models" {
+			t.Errorf("unexpected path: %s (expected /v1/models)", r.URL.Path)
+			http.NotFound(w, r)
+			return
+		}
+		resp := map[string]any{
+			"data": []map[string]string{{"id": "nvidia/llama-3.1-nemotron-70b-instruct"}},
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(resp)
+	}))
+	defer srv.Close()
+
+	// Pass baseURL with /v1 suffix, as NVIDIA NIM and similar providers use.
+	result := FetchModels(srv.URL+"/v1", "nvapi-test-key", "nvidia")
+	if result.Err != nil {
+		t.Fatalf("unexpected error: %v", result.Err)
+	}
+	if len(result.Models) != 1 || result.Models[0].ID != "nvidia/llama-3.1-nemotron-70b-instruct" {
+		t.Errorf("unexpected models: %v", result.Models)
+	}
+}

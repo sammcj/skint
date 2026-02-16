@@ -295,6 +295,7 @@ type Definition struct {
 	AuthToken     string // For local providers
 	KeyVar        string // Environment variable name for API key
 	KeyEnvVar     string // env var name to set for Claude (default: ANTHROPIC_AUTH_TOKEN)
+	APIType       string // For custom providers: "anthropic" or "openai"
 }
 
 // NewRegistry creates a new provider registry with built-in definitions
@@ -416,6 +417,15 @@ func (r *Registry) registerBuiltins() {
 			KeyVar:        "DEEPSEEK_API_KEY",
 		},
 		{
+			Name:        "nvidia",
+			DisplayName: "NVIDIA NIM",
+			Description: "NVIDIA NIM API (OpenAI-compatible)",
+			Type:        config.ProviderTypeCustom,
+			APIType:     config.APITypeOpenAI,
+			BaseURL:     "https://integrate.api.nvidia.com/v1",
+			KeyVar:      "NVIDIA_API_KEY",
+		},
+		{
 			Name:        "ollama",
 			DisplayName: "Ollama",
 			Description: "Ollama local server",
@@ -462,6 +472,7 @@ func (r *Registry) CreateProvider(name string, apiKey string) (Provider, error) 
 		ModelMappings: def.ModelMappings,
 		AuthToken:     def.AuthToken,
 		KeyEnvVar:     def.KeyEnvVar,
+		APIType:       def.APIType,
 	}
 
 	provider, err := FromConfig(cp)

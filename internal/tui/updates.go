@@ -382,6 +382,7 @@ func (m *Model) updateAPIKeyInput(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			ModelMappings: m.selectedProvider.ModelMappings,
 			APIKeyRef:     ref,
 			KeyEnvVar:     m.selectedProvider.KeyEnvVar,
+			APIType:       m.selectedProvider.APIType,
 		}
 
 		// Set model if user provided one (e.g. for OpenRouter)

@@ -89,13 +89,16 @@ func (cc *CmdContext) ResolveProvider(name string) (*config.Provider, error) {
 		}
 
 		p = &config.Provider{
-			Name:         def.Name,
-			Type:         def.Type,
-			DisplayName:  def.DisplayName,
-			Description:  def.Description,
-			BaseURL:      def.BaseURL,
-			DefaultModel: def.DefaultModel,
-			AuthToken:    def.AuthToken,
+			Name:          def.Name,
+			Type:          def.Type,
+			DisplayName:   def.DisplayName,
+			Description:   def.Description,
+			BaseURL:       def.BaseURL,
+			DefaultModel:  def.DefaultModel,
+			ModelMappings: def.ModelMappings,
+			AuthToken:     def.AuthToken,
+			KeyEnvVar:     def.KeyEnvVar,
+			APIType:       def.APIType,
 		}
 
 		// For non-local providers, try to load a stored key

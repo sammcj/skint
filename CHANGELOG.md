@@ -2,6 +2,11 @@
 
 <!-- Add changes following the format below - keep them concise and leave this comment as-is, use date +'%F %H:%M' for the date and local time  -->
 
+## 2026-03-03 22:07
+
+### Added
+- `--resume <session-id>` and `--continue` / `-c` flags to pass through to claude for session resumption
+
 ## 2026-02-16 18:00
 
 ### Improved

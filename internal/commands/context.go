@@ -34,6 +34,9 @@ type CmdContext struct {
 
 	// cfgFile is the user-supplied config path (empty = default)
 	cfgFile string
+
+	// ClaudeExtraArgs holds additional arguments to pass through to claude (e.g. --resume, --continue)
+	ClaudeExtraArgs []string
 }
 
 // GetContext extracts the CmdContext from a cobra command's context.
@@ -227,6 +230,7 @@ func (cc *CmdContext) LaunchClaude(providerName string) error {
 	}
 
 	args := append([]string{}, cc.Cfg.ClaudeArgs...)
+	args = append(args, cc.ClaudeExtraArgs...)
 
 	if providerName == "" {
 		// Native: launch claude without provider env vars

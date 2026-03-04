@@ -2,6 +2,18 @@
 
 <!-- Add changes following the format below - keep them concise and leave this comment as-is, use date +'%F %H:%M' for the date and local time  -->
 
+## 2026-03-04 12:00
+
+### Fixed
+- `skint use` now passes `--resume` and `--continue` flags through to claude (previously only the TUI path did)
+- README incorrectly listed `-c` as shorthand for both `--config` and `--continue`; `--config` has no shorthand
+- Reset `ClaudeExtraArgs` before appending to prevent potential accumulation
+
+## 2026-03-03 22:07
+
+### Added
+- `--resume <session-id>` and `--continue` / `-c` flags to pass through to claude for session resumption
+
 ## 2026-02-16 18:00
 
 ### Improved

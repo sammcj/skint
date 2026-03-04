@@ -19,6 +19,9 @@ type RootCmd struct {
 
 // NewRootCmd creates the root command
 func NewRootCmd(version string) *RootCmd {
+	var resumeSession string
+	var continueSession bool
+
 	cc := &CmdContext{
 		OutputFormat: "human",
 	}
@@ -35,6 +38,16 @@ Ollama, LM Studio, or llama.cpp.`,
 		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
 			// Ensure context is set before initialize runs
 			cmd.SetContext(context.WithValue(cmd.Context(), ctxKey, cc))
+
+			// Build passthrough args for claude (reset first to avoid accumulation)
+			cc.ClaudeExtraArgs = nil
+			if resumeSession != "" {
+				cc.ClaudeExtraArgs = append(cc.ClaudeExtraArgs, "--resume", resumeSession)
+			}
+			if continueSession {
+				cc.ClaudeExtraArgs = append(cc.ClaudeExtraArgs, "--continue")
+			}
+
 			return initialize(cc)
 		},
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -56,6 +69,10 @@ Ollama, LM Studio, or llama.cpp.`,
 	root.PersistentFlags().BoolVar(&cc.NoBanner, "no-banner", false, "hide banner")
 	root.PersistentFlags().StringVar(&cc.OutputFormat, "output", "human", "output format: human, json, plain")
 	root.PersistentFlags().StringVar(&cc.BinDir, "bin-dir", "", "binary directory (default is ~/.local/bin on Linux, ~/bin on macOS)")
+
+	// Claude passthrough flags
+	root.PersistentFlags().StringVar(&resumeSession, "resume", "", "resume a Claude session by ID")
+	root.PersistentFlags().BoolVarP(&continueSession, "continue", "c", false, "continue the most recent Claude session")
 
 	return &RootCmd{root}
 }

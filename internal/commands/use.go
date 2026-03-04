@@ -53,7 +53,9 @@ func runUse(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("failed to create launcher: %w", err)
 	}
 
-	// Launch Claude
-	// This will replace the current process on Unix
+	// Merge passthrough args (e.g. --resume, --continue) with any trailing args
+	claudeArgs = append(cc.ClaudeExtraArgs, claudeArgs...)
+
+	// Launch Claude - replaces the current process on Unix
 	return l.Launch(provider, claudeArgs)
 }

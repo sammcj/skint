@@ -81,7 +81,7 @@ skint migrate                Import config from the old bash version
 ### Global flags
 
 ```
--c, --config <path>    Config file path
+    --config <path>    Config file path
 -v, --verbose          Verbose output
 -q, --quiet            Minimal output
 -y, --yes              Auto-confirm prompts
@@ -89,6 +89,8 @@ skint migrate                Import config from the old bash version
     --no-color         Disable colours
     --no-banner        Hide startup banner
     --output <format>  Output format: human (default), json, plain
+    --resume <id>      Resume a Claude session by ID
+-c, --continue         Continue the most recent Claude session
 ```
 
 ## Configuration

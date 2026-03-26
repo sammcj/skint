@@ -105,8 +105,9 @@ func (c *Config) Validate() error {
 		}
 	}
 
-	// Validate default provider exists
-	if c.DefaultProvider != "" {
+	// Validate default provider exists in the providers list.
+	// "native" is exempt: it's a built-in that requires no configuration entry.
+	if c.DefaultProvider != "" && c.DefaultProvider != "native" {
 		if _, ok := names[c.DefaultProvider]; !ok {
 			return fmt.Errorf("default provider %s not found in providers list", c.DefaultProvider)
 		}

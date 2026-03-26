@@ -21,6 +21,7 @@
 - **Security**: `config.Save()` now checks for symlinks before writing (matching `Load()` behaviour)
 - **Security**: `GenerateScript` now properly shell-escapes display names and env var values
 - **Critical**: `ScreenOpenRouter` TUI dead-end state - pressing 'o' now correctly navigates to OpenRouter config
+- Selecting "native" provider in TUI caused validation error on save because `Validate()` required it to be in the providers list
 - Non-deterministic `unescape()` in migration due to map iteration order - now uses ordered slice
 - OpenRouter `FromConfig` unconditionally blanking model when only `DefaultModel` was set
 - `BuiltinProvider.GetEnvVars` now clears the conflicting API key env var (AUTH_TOKEN vs API_KEY)

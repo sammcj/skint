@@ -14,6 +14,7 @@ type Config struct {
 	OutputFormat    string      `yaml:"output_format" mapstructure:"output_format"`
 	ColorEnabled    bool        `yaml:"color_enabled" mapstructure:"color_enabled"`
 	NoBanner        bool        `yaml:"no_banner" mapstructure:"no_banner"`
+	ForceFileStore  bool        `yaml:"force_file_store,omitempty" mapstructure:"force_file_store"`
 	ClaudeArgs      []string    `yaml:"claude_args,omitempty" mapstructure:"claude_args"`
 	Providers       []*Provider `yaml:"providers" mapstructure:"providers"`
 }

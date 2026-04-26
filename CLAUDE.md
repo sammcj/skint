@@ -27,7 +27,7 @@ Skint is a CLI launcher that wraps Claude Code with different LLM provider confi
 - `providers/` - `Provider` interface with four implementations: `BuiltinProvider`, `OpenRouterProvider`, `LocalProvider`, `CustomProvider`. All embed `baseProvider`. Registry of 10 built-in providers defined as data. `baseProvider.keyEnvVar` overrides the default env var name for the API key (used by the `anthropic` provider to set `ANTHROPIC_API_KEY` instead of `ANTHROPIC_AUTH_TOKEN`).
 - `models/` - Model fetching from provider APIs. Strategies: OpenAI-compatible (`/v1/models`), Ollama (`/api/tags`), OpenRouter (public listing). Used by the TUI model picker.
 - `launcher/` - Builds env vars from a `Provider`, strips conflicting ANTHROPIC_*/OPENAI_* vars from the current env, then uses `syscall.Exec` on Unix (process replacement for signal forwarding) or `exec.Command` on Windows.
-- `secrets/` - Two-tier credential storage: OS keyring (primary) with AES-256-GCM encrypted file fallback (`~/.local/share/skint/secrets.enc`). API key refs use format `keyring:<name>` or `file:<name>`.
+- `secrets/` - Two-tier credential storage: OS keyring (primary) with AES-256-GCM encrypted file fallback (`~/.local/share/skint/secrets.enc`). API key refs use format `keyring:<name>` or `file:<name>`. `force_file_store` (`SKINT_FORCE_FILE_STORE`) skips the keyring for sandboxed use; no `keyring.*` call may be reachable in that mode, so `keyring:` refs return an error instead of falling back.
 - `tui/` - Bubble Tea interactive UI. `model.go` is the main state machine. `modelpicker.go` handles async model fetching and picker overlay state. Handles provider selection, API key input, custom provider config.
 - `ui/` - Simple non-interactive CLI components (colours, menus, prompts).
 

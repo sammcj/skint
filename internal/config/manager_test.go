@@ -558,6 +558,54 @@ func TestApplyEnvOverrides(t *testing.T) {
 			},
 		},
 		{
+			name: "SKINT_FORCE_FILE_STORE enables file store",
+			envVars: map[string]string{
+				"SKINT_FORCE_FILE_STORE": "1",
+			},
+			check: func(t *testing.T, cfg *Config) {
+				t.Helper()
+				if !cfg.ForceFileStore {
+					t.Error("ForceFileStore: expected true when SKINT_FORCE_FILE_STORE is set")
+				}
+			},
+		},
+		{
+			name: "SKINT_FORCE_FILE_STORE true enables file store",
+			envVars: map[string]string{
+				"SKINT_FORCE_FILE_STORE": "true",
+			},
+			check: func(t *testing.T, cfg *Config) {
+				t.Helper()
+				if !cfg.ForceFileStore {
+					t.Error("ForceFileStore: expected true when SKINT_FORCE_FILE_STORE=true")
+				}
+			},
+		},
+		{
+			name: "SKINT_FORCE_FILE_STORE 0 leaves file store disabled",
+			envVars: map[string]string{
+				"SKINT_FORCE_FILE_STORE": "0",
+			},
+			check: func(t *testing.T, cfg *Config) {
+				t.Helper()
+				if cfg.ForceFileStore {
+					t.Error("ForceFileStore: expected false when SKINT_FORCE_FILE_STORE=0")
+				}
+			},
+		},
+		{
+			name: "SKINT_FORCE_FILE_STORE invalid value is ignored",
+			envVars: map[string]string{
+				"SKINT_FORCE_FILE_STORE": "yes please",
+			},
+			check: func(t *testing.T, cfg *Config) {
+				t.Helper()
+				if cfg.ForceFileStore {
+					t.Error("ForceFileStore: expected false for invalid SKINT_FORCE_FILE_STORE value")
+				}
+			},
+		},
+		{
 			name:    "no env vars leaves defaults untouched",
 			envVars: map[string]string{},
 			check: func(t *testing.T, cfg *Config) {

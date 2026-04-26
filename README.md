@@ -99,15 +99,31 @@ Config lives at `~/.config/skint/config.yaml` (XDG-compliant). API keys are stor
 
 ### Environment variable overrides
 
-| Variable                 | Effect                    |
-| ------------------------ | ------------------------- |
-| `SKINT_DEFAULT_PROVIDER` | Override default provider |
-| `SKINT_VERBOSE`          | Enable verbose output     |
-| `SKINT_QUIET`            | Minimal output            |
-| `SKINT_YES`              | Auto-confirm prompts      |
-| `SKINT_NO_INPUT`         | Non-interactive mode      |
-| `SKINT_NO_BANNER`        | Hide banner               |
-| `NO_COLOR`               | Disable colours           |
+| Variable                 | Effect                                         |
+| ------------------------ | ---------------------------------------------- |
+| `SKINT_DEFAULT_PROVIDER` | Override default provider                      |
+| `SKINT_FORCE_FILE_STORE` | Use encrypted file store instead of OS keyring |
+| `SKINT_VERBOSE`          | Enable verbose output                          |
+| `SKINT_QUIET`            | Minimal output                                 |
+| `SKINT_YES`              | Auto-confirm prompts                           |
+| `SKINT_NO_INPUT`         | Non-interactive mode                           |
+| `SKINT_NO_BANNER`        | Hide banner                                    |
+| `NO_COLOR`               | Disable colours                                |
+
+### Sandboxed environments
+
+In sandboxed environments (e.g. nono), the OS keyring is accessed via `securityd` which operates outside the sandbox. To avoid exposing the login keychain, force skint to use the encrypted file store:
+
+    force_file_store: true
+
+Or set `SKINT_FORCE_FILE_STORE=1`.
+
+Sandbox permissions needed:
+
+- **Launching with existing config and keys:** read access to `~/.config/skint` and `~/.local/share/skint`
+- **Adding or changing providers or keys:** write access to both as well (`config.yaml` and `secrets.enc` are rewritten on save)
+
+Keys previously stored in the OS keyring are not read in this mode. Re-enter them (e.g. via `skint config`) so they are saved to the file store.
 
 ## Development
 

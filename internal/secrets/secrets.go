@@ -22,13 +22,17 @@ const (
 
 // Manager handles secure storage of API keys
 type Manager struct {
-	useKeyring bool
-	dataDir    string
-	fileStore  *FileStore
+	useKeyring     bool
+	forceFileStore bool
+	dataDir        string
+	fileStore      *FileStore
 }
 
-// NewManager creates a new secrets manager
-func NewManager() (*Manager, error) {
+// NewManager creates a new secrets manager.
+// When forceFileStore is true, the manager skips the OS keyring entirely
+// and uses the AES-256-GCM encrypted file store. This is useful in
+// sandboxed environments where keyring access is undesirable.
+func NewManager(forceFileStore bool) (*Manager, error) {
 	dataDir, err := config.GetDataDir()
 	if err != nil {
 		return nil, fmt.Errorf("failed to get data directory: %w", err)
@@ -39,12 +43,16 @@ func NewManager() (*Manager, error) {
 		return nil, fmt.Errorf("failed to create data directory: %w", err)
 	}
 
-	// Test if keyring is available
-	useKeyring := testKeyring()
+	useKeyring := false
+	if !forceFileStore {
+		// Test if keyring is available
+		useKeyring = testKeyring()
+	}
 
 	m := &Manager{
-		useKeyring: useKeyring,
-		dataDir:    dataDir,
+		useKeyring:     useKeyring,
+		forceFileStore: forceFileStore,
+		dataDir:        dataDir,
 	}
 
 	if !useKeyring {
@@ -120,7 +128,9 @@ func (m *Manager) RetrieveByReference(ref string) (string, error) {
 
 	switch refType {
 	case StorageTypeKeyring:
-		// Always try keyring first for keyring references
+		if m.forceFileStore {
+			return "", fmt.Errorf("key for %s is stored in the OS keyring but force_file_store is enabled; re-enter it with 'skint config %s'", providerName, providerName)
+		}
 		return keyring.Get(ServiceName, providerName)
 	case StorageTypeFile:
 		// Use file store

@@ -1,9 +1,13 @@
 package secrets
 
 import (
+	"errors"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
+
+	"github.com/zalando/go-keyring"
 )
 
 func TestFileStoreStoreAndRetrieve(t *testing.T) {
@@ -191,4 +195,42 @@ func TestRetrieveByReferenceFormat(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestRetrieveByReferenceForceFileStore(t *testing.T) {
+	errKeyringCalled := errors.New("keyring must not be called")
+	keyring.MockInitWithError(errKeyringCalled)
+
+	tmpDir := t.TempDir()
+	fs, err := NewFileStore(tmpDir)
+	if err != nil {
+		t.Fatalf("NewFileStore: %v", err)
+	}
+	if err := fs.Store("myprovider", "sk-file-key"); err != nil {
+		t.Fatalf("Store: %v", err)
+	}
+	m := &Manager{forceFileStore: true, dataDir: tmpDir, fileStore: fs}
+
+	t.Run("keyring ref errors without calling keyring", func(t *testing.T) {
+		_, err := m.RetrieveByReference("keyring:myprovider")
+		if err == nil {
+			t.Fatal("expected error for keyring ref with force_file_store enabled")
+		}
+		if errors.Is(err, errKeyringCalled) {
+			t.Fatalf("keyring was called: %v", err)
+		}
+		if !strings.Contains(err.Error(), "force_file_store") || !strings.Contains(err.Error(), "skint config myprovider") {
+			t.Errorf("error should mention force_file_store and how to re-enter the key, got: %v", err)
+		}
+	})
+
+	t.Run("file ref still works", func(t *testing.T) {
+		got, err := m.RetrieveByReference("file:myprovider")
+		if err != nil {
+			t.Fatalf("RetrieveByReference: %v", err)
+		}
+		if got != "sk-file-key" {
+			t.Errorf("got %q, want %q", got, "sk-file-key")
+		}
+	})
 }

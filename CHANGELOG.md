@@ -20,6 +20,15 @@
 
 - TUI test suite (`internal/tui/tui_test.go`) covering the fetch-generation and stale-selection fixes
 
+## 2026-04-26 20:27
+
+### Added
+
+- `force_file_store` config option and `SKINT_FORCE_FILE_STORE` env var (`1`/`0`, `true`/`false`; invalid values are ignored with a warning) to bypass OS keyring and use the AES-256-GCM encrypted file store -- useful for sandboxed environments where keyring access is undesirable
+- With `force_file_store` enabled, `keyring:` key references return an error asking you to re-enter the key instead of calling the OS keyring
+
+## 2026-03-04 12:00
+
 ### Fixed
 - `skint use` now passes `--resume` and `--continue` flags through to claude (previously only the TUI path did)
 - README incorrectly listed `-c` as shorthand for both `--config` and `--continue`; `--config` has no shorthand

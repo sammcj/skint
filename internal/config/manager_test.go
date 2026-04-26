@@ -390,6 +390,18 @@ func TestApplyEnvOverrides(t *testing.T) {
 			},
 		},
 		{
+			name: "SKINT_FORCE_FILE_STORE enables file store",
+			envVars: map[string]string{
+				"SKINT_FORCE_FILE_STORE": "1",
+			},
+			check: func(t *testing.T, cfg *Config) {
+				t.Helper()
+				if !cfg.ForceFileStore {
+					t.Error("ForceFileStore: expected true when SKINT_FORCE_FILE_STORE is set")
+				}
+			},
+		},
+		{
 			name:    "no env vars leaves defaults untouched",
 			envVars: map[string]string{},
 			check: func(t *testing.T, cfg *Config) {

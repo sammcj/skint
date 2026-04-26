@@ -135,7 +135,7 @@ func initialize(cc *CmdContext) error {
 	ui.Init(cc.Cfg)
 
 	// Create secrets manager
-	cc.SecretsMgr, err = secrets.NewManager()
+	cc.SecretsMgr, err = secrets.NewManager(cc.Cfg.ForceFileStore)
 	if err != nil {
 		return fmt.Errorf("failed to initialise secrets: %w", err)
 	}

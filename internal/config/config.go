@@ -185,6 +185,9 @@ func (m *Manager) applyEnvOverrides() {
 	if os.Getenv("SKINT_NO_BANNER") != "" {
 		m.config.NoBanner = true
 	}
+	if os.Getenv("SKINT_FORCE_FILE_STORE") != "" {
+		m.config.ForceFileStore = true
+	}
 }
 
 // getConfigDir returns the XDG-compliant config directory

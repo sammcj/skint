@@ -27,8 +27,11 @@ type Manager struct {
 	fileStore  *FileStore
 }
 
-// NewManager creates a new secrets manager
-func NewManager() (*Manager, error) {
+// NewManager creates a new secrets manager.
+// When forceFileStore is true, the manager skips the OS keyring entirely
+// and uses the AES-256-GCM encrypted file store. This is useful in
+// sandboxed environments where keyring access is undesirable.
+func NewManager(forceFileStore bool) (*Manager, error) {
 	dataDir, err := config.GetDataDir()
 	if err != nil {
 		return nil, fmt.Errorf("failed to get data directory: %w", err)
@@ -39,8 +42,11 @@ func NewManager() (*Manager, error) {
 		return nil, fmt.Errorf("failed to create data directory: %w", err)
 	}
 
-	// Test if keyring is available
-	useKeyring := testKeyring()
+	useKeyring := false
+	if !forceFileStore {
+		// Test if keyring is available
+		useKeyring = testKeyring()
+	}
 
 	m := &Manager{
 		useKeyring: useKeyring,
@@ -101,7 +107,6 @@ func (m *Manager) StoreWithReference(providerName, apiKey string) (string, error
 	if err := m.Store(providerName, apiKey); err != nil {
 		return "", err
 	}
-
 	if m.useKeyring {
 		return fmt.Sprintf("%s:%s", StorageTypeKeyring, providerName), nil
 	}
@@ -148,13 +153,13 @@ func (m *Manager) MigrateFromOld() (map[string]string, error) {
 		return nil, fmt.Errorf("failed to import old secrets: %w", err)
 	}
 
-	// Store all keys
+	// Store each key
 	stored := make(map[string]string)
-	for providerName, apiKey := range keys {
-		if err := m.Store(providerName, apiKey); err != nil {
-			return stored, fmt.Errorf("failed to store key for %s: %w", providerName, err)
+	for name, key := range keys {
+		if _, err := m.StoreWithReference(name, key); err != nil {
+			return stored, fmt.Errorf("failed to store key for %s: %w", name, err)
 		}
-		stored[providerName] = apiKey
+		stored[name] = key
 	}
 
 	return stored, nil

@@ -2,6 +2,12 @@
 
 <!-- Add changes following the format below - keep them concise and leave this comment as-is, use date +'%F %H:%M' for the date and local time  -->
 
+## 2026-04-26
+
+### Added
+
+- `force_file_store` config option and `SKINT_FORCE_FILE_STORE` env var to bypass OS keyring and use the AES-256-GCM encrypted file store -- useful for sandboxed environments where keyring access is undesirable
+
 ## 2026-03-04 12:00
 
 ### Fixed

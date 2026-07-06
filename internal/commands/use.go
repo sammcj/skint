@@ -22,6 +22,9 @@ Any additional arguments are passed directly to Claude.`,
   skint use ollama --model qwen3   # Use local Ollama`,
 		Args: cobra.MinimumNArgs(1),
 		RunE: runUse,
+		// Disable flag parsing so provider flags (e.g. --model) pass through to
+		// claude rather than being rejected by cobra. Mirrors the exec command.
+		DisableFlagParsing: true,
 	}
 }
 

@@ -1,9 +1,39 @@
 package launcher
 
 import (
+	"os"
+	"path/filepath"
 	"slices"
 	"testing"
+
+	"github.com/sammcj/skint/internal/config"
+	"github.com/sammcj/skint/internal/providers"
 )
+
+func TestGenerateScriptPermissions(t *testing.T) {
+	dir := t.TempDir()
+	p, err := providers.FromConfig(&config.Provider{
+		Name:    "zai",
+		Type:    config.ProviderTypeBuiltin,
+		BaseURL: "https://api.z.ai/api/anthropic",
+	})
+	if err != nil {
+		t.Fatalf("FromConfig: %v", err)
+	}
+	p.SetAPIKey("secret-key")
+
+	if err := GenerateScript(p, dir); err != nil {
+		t.Fatalf("GenerateScript: %v", err)
+	}
+
+	info, err := os.Stat(filepath.Join(dir, "skint-zai"))
+	if err != nil {
+		t.Fatalf("Stat: %v", err)
+	}
+	if perm := info.Mode().Perm(); perm != 0700 {
+		t.Errorf("script permissions: got %o, want 0700 (embeds an API key)", perm)
+	}
+}
 
 // envEqual reports whether two environment slices contain the same entries
 // in the same order. Both nil and empty slices are treated as equivalent.

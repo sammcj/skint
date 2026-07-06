@@ -510,6 +510,66 @@ func TestFromConfig_CustomFallsBackToModelField(t *testing.T) {
 	}
 }
 
+func TestFromConfig_BuiltinExportsUserModel(t *testing.T) {
+	// A builtin provider with only Model set (no DefaultModel) must export
+	// ANTHROPIC_MODEL -- this is the anthropic builtin case where the TUI
+	// requires a model but the registry ships no default.
+	cp := &config.Provider{
+		Name:  "anthropic",
+		Type:  config.ProviderTypeBuiltin,
+		Model: "claude-sonnet-4-20250514",
+	}
+	cp.SetResolvedAPIKey("sk-ant-test")
+
+	p, err := FromConfig(cp)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if got := p.GetEnvVars()["ANTHROPIC_MODEL"]; got != "claude-sonnet-4-20250514" {
+		t.Errorf("ANTHROPIC_MODEL = %q, want %q", got, "claude-sonnet-4-20250514")
+	}
+}
+
+func TestFromConfig_BuiltinModelOverridesDefault(t *testing.T) {
+	// When both Model and DefaultModel are set on a builtin (e.g. zai), the
+	// user-selected Model must win.
+	cp := &config.Provider{
+		Name:         "zai",
+		Type:         config.ProviderTypeBuiltin,
+		BaseURL:      "https://api.z.ai/api/anthropic",
+		DefaultModel: "glm-5",
+		Model:        "glm-4.7",
+	}
+	cp.SetResolvedAPIKey("zai-key")
+
+	p, err := FromConfig(cp)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if got := p.GetEnvVars()["ANTHROPIC_MODEL"]; got != "glm-4.7" {
+		t.Errorf("ANTHROPIC_MODEL = %q, want %q", got, "glm-4.7")
+	}
+}
+
+func TestFromConfig_LocalExportsUserModel(t *testing.T) {
+	// A local provider with Model set must export ANTHROPIC_MODEL.
+	cp := &config.Provider{
+		Name:      "ollama",
+		Type:      config.ProviderTypeLocal,
+		BaseURL:   "http://localhost:11434",
+		AuthToken: "ollama",
+		Model:     "qwen3",
+	}
+
+	p, err := FromConfig(cp)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if got := p.GetEnvVars()["ANTHROPIC_MODEL"]; got != "qwen3" {
+		t.Errorf("ANTHROPIC_MODEL = %q, want %q", got, "qwen3")
+	}
+}
+
 // containsSubstring checks whether s contains substr.
 func containsSubstring(s, substr string) bool {
 	return len(s) >= len(substr) && (s == substr || len(s) > 0 && containsAt(s, substr))

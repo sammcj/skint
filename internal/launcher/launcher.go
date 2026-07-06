@@ -179,8 +179,8 @@ exec claude "$@"
 		return fmt.Errorf("failed to create bin directory: %w", err)
 	}
 
-	// Write script
-	if err := os.WriteFile(scriptPath, []byte(script), 0755); err != nil {
+	// Write script with owner-only permissions: it embeds the provider's API key.
+	if err := os.WriteFile(scriptPath, []byte(script), 0700); err != nil {
 		return fmt.Errorf("failed to write script: %w", err)
 	}
 

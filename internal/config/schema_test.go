@@ -218,7 +218,7 @@ func TestNeedsAPIKey(t *testing.T) {
 }
 
 // TestEffectiveModel verifies the model selection priority:
-// DefaultModel takes precedence, then Model, then empty.
+// the user-selected Model takes precedence, then DefaultModel, then empty.
 func TestEffectiveModel(t *testing.T) {
 	tests := []struct {
 		name         string
@@ -227,10 +227,10 @@ func TestEffectiveModel(t *testing.T) {
 		want         string
 	}{
 		{
-			name:         "returns DefaultModel when set",
+			name:         "returns Model when set over DefaultModel",
 			defaultModel: "claude-opus-4-20250514",
 			model:        "claude-sonnet-4-20250514",
-			want:         "claude-opus-4-20250514",
+			want:         "claude-sonnet-4-20250514",
 		},
 		{
 			name:         "returns Model when DefaultModel is empty",
@@ -239,16 +239,22 @@ func TestEffectiveModel(t *testing.T) {
 			want:         "claude-sonnet-4-20250514",
 		},
 		{
+			name:         "returns DefaultModel when Model is empty",
+			defaultModel: "glm-5",
+			model:        "",
+			want:         "glm-5",
+		},
+		{
 			name:         "returns empty when both are empty",
 			defaultModel: "",
 			model:        "",
 			want:         "",
 		},
 		{
-			name:         "returns DefaultModel even when Model is also set",
-			defaultModel: "preferred-model",
-			model:        "fallback-model",
-			want:         "preferred-model",
+			name:         "returns Model even when DefaultModel is also set",
+			defaultModel: "registry-default",
+			model:        "user-selected",
+			want:         "user-selected",
 		},
 	}
 

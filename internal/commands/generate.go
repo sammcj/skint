@@ -77,11 +77,6 @@ func runGenerate(cmd *cobra.Command, args []string) error {
 		generated++
 	}
 
-	// Also generate the main skint command script
-	if err := generateMainScript(binDir); err != nil {
-		ui.Warning("Failed to generate main script: %v", err)
-	}
-
 	// Save banner
 	if err := saveBanner(); err != nil && cc.Verbose {
 		ui.Warning("Failed to save banner: %v", err)
@@ -105,6 +100,10 @@ func runGenerate(cmd *cobra.Command, args []string) error {
 	fmt.Println()
 	ui.Success("Generated %d scripts in %s", generated, binDir)
 
+	if generated > 0 {
+		ui.Warning("Scripts embed provider API keys in plaintext (written 0700, owner-only).")
+	}
+
 	if failed > 0 {
 		ui.Warning("Failed to generate %d scripts", failed)
 	}
@@ -126,45 +125,6 @@ func runGenerate(cmd *cobra.Command, args []string) error {
 	}
 
 	return nil
-}
-
-func generateMainScript(binDir string) error {
-	scriptPath := filepath.Join(binDir, "skint")
-
-	script := `#!/usr/bin/env bash
-# Skint - Multi-provider launcher for Claude Code
-# Generated wrapper script
-
-set -euo pipefail
-
-# Find the actual skint binary
-SKINT_BIN=""
-
-# Check if skint is in PATH
-if command -v skint >/dev/null; then
-    SKINT_BIN=$(command -v skint)
-fi
-
-# Fallback to common locations
-if [[ -z "$SKINT_BIN" ]]; then
-    for dir in "$HOME/.local/bin" "$HOME/bin" "/usr/local/bin"; do
-        if [[ -x "$dir/skint" ]]; then
-            SKINT_BIN="$dir/skint"
-            break
-        fi
-    done
-fi
-
-if [[ -z "$SKINT_BIN" ]]; then
-    echo "Error: skint binary not found" >&2
-    echo "Please install Skint: https://github.com/sammcj/skint" >&2
-    exit 1
-fi
-
-exec "$SKINT_BIN" "$@"
-`
-
-	return os.WriteFile(scriptPath, []byte(script), 0755)
 }
 
 func saveBanner() error {

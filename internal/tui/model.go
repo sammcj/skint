@@ -81,6 +81,10 @@ type Model struct {
 	modelPickerIdx  int
 	modelFetching   bool
 	modelFetchErr   string
+	// fetchGeneration tags each async model fetch. Results whose generation no
+	// longer matches (a newer fetch started, or the picker was reset) are
+	// discarded so a late-arriving fetch cannot hijack a different screen.
+	fetchGeneration int
 
 	// Results
 	message       string
@@ -501,12 +505,19 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 
 	case modelsFetchedMsg:
+		// Discard stale results: a newer fetch started or the picker was reset
+		// (e.g. the user navigated away) since this fetch was issued.
+		if msg.generation != m.fetchGeneration {
+			return m, nil
+		}
 		m.modelFetching = false
 		if msg.err != nil {
 			m.modelFetchErr = msg.err.Error()
 		} else {
 			m.fetchedModels = msg.models
-			if len(msg.models) > 0 {
+			// Only open the picker if focus is still on the model field, so a
+			// completed fetch never grabs keystrokes on the API key field.
+			if len(msg.models) > 0 && m.isOnModelField() {
 				m.modelPickerOpen = true
 				m.modelPickerIdx = 0
 			}

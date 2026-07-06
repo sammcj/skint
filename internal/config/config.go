@@ -14,6 +14,34 @@ type Manager struct {
 	configDir  string
 	configFile string
 	config     *Config
+	overrides  envOverrides
+}
+
+// envOverrides records persisted config values that were replaced by SKINT_*
+// environment overrides at Load time. Save reverts to these so transient env
+// settings are never written to disk. A nil pointer means the field was not
+// overridden.
+type envOverrides struct {
+	defaultProvider *fieldOverride[string]
+	outputFormat    *fieldOverride[string]
+	colorEnabled    *fieldOverride[bool]
+	noBanner        *fieldOverride[bool]
+}
+
+// fieldOverride pairs the persisted value with the env value that replaced it.
+type fieldOverride[T comparable] struct {
+	persisted T
+	applied   T
+}
+
+// revert returns the value Save should persist: the pre-override value while the
+// runtime value still equals the applied override, otherwise the runtime value -
+// a deliberate change (e.g. the TUI setting a new default provider) must win.
+func (o *fieldOverride[T]) revert(current T) T {
+	if o != nil && current == o.applied {
+		return o.persisted
+	}
+	return current
 }
 
 // NewManager creates a new configuration manager
@@ -88,6 +116,9 @@ func (m *Manager) Load() error {
 	// Apply environment overrides
 	m.applyEnvOverrides()
 
+	// A SKINT_DEFAULT_PROVIDER naming an unknown provider is non-fatal.
+	m.resolveDefaultProviderOverride()
+
 	// Validate
 	if err := m.config.Validate(); err != nil {
 		return fmt.Errorf("invalid configuration: %w", err)
@@ -115,28 +146,16 @@ func (m *Manager) Save() error {
 		}
 	}
 
+	// Revert env overrides so transient settings are not persisted.
+	toSave := m.configForSave()
+
 	// Marshal to YAML
-	data, err := yaml.Marshal(m.config)
+	data, err := yaml.Marshal(&toSave)
 	if err != nil {
 		return fmt.Errorf("failed to marshal config: %w", err)
 	}
 
-	// Write with secure permissions
-	f, err := os.OpenFile(m.configFile, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0600)
-	if err != nil {
-		return fmt.Errorf("failed to open config file: %w", err)
-	}
-
-	if _, err := f.Write(data); err != nil {
-		f.Close()
-		return fmt.Errorf("failed to write config file: %w", err)
-	}
-
-	if err := f.Close(); err != nil {
-		return fmt.Errorf("failed to close config file: %w", err)
-	}
-
-	return nil
+	return m.writeAtomic(data)
 }
 
 // Get returns the current configuration
@@ -165,14 +184,19 @@ func (m *Manager) Exists() bool {
 	return err == nil
 }
 
-// applyEnvOverrides applies SKINT_* environment variable overrides
+// applyEnvOverrides applies SKINT_* environment variable overrides, recording
+// the pre-override values so Save can revert them (see envOverrides).
 func (m *Manager) applyEnvOverrides() {
+	m.overrides = envOverrides{}
+
 	if v := os.Getenv("SKINT_DEFAULT_PROVIDER"); v != "" {
+		m.overrides.defaultProvider = &fieldOverride[string]{persisted: m.config.DefaultProvider, applied: v}
 		m.config.DefaultProvider = v
 	}
 	if v := os.Getenv("SKINT_OUTPUT_FORMAT"); v != "" {
 		switch v {
 		case FormatHuman, FormatJSON, FormatPlain:
+			m.overrides.outputFormat = &fieldOverride[string]{persisted: m.config.OutputFormat, applied: v}
 			m.config.OutputFormat = v
 		default:
 			fmt.Fprintf(os.Stderr, "warning: ignoring invalid SKINT_OUTPUT_FORMAT=%q (valid: %s, %s, %s)\n",
@@ -180,11 +204,75 @@ func (m *Manager) applyEnvOverrides() {
 		}
 	}
 	if os.Getenv("SKINT_NO_COLOR") != "" || os.Getenv("NO_COLOR") != "" {
+		m.overrides.colorEnabled = &fieldOverride[bool]{persisted: m.config.ColorEnabled, applied: false}
 		m.config.ColorEnabled = false
 	}
 	if os.Getenv("SKINT_NO_BANNER") != "" {
+		m.overrides.noBanner = &fieldOverride[bool]{persisted: m.config.NoBanner, applied: true}
 		m.config.NoBanner = true
 	}
+}
+
+// resolveDefaultProviderOverride handles a SKINT_DEFAULT_PROVIDER that names an
+// unknown provider: rather than failing validation, warn and fall back to the
+// persisted default.
+func (m *Manager) resolveDefaultProviderOverride() {
+	if m.overrides.defaultProvider == nil {
+		return
+	}
+	name := m.config.DefaultProvider
+	if name == "native" || m.config.GetProvider(name) != nil {
+		return
+	}
+	fmt.Fprintf(os.Stderr, "warning: SKINT_DEFAULT_PROVIDER=%q not found in config; using %q\n",
+		name, m.overrides.defaultProvider.persisted)
+	m.config.DefaultProvider = m.overrides.defaultProvider.persisted
+	m.overrides.defaultProvider = nil
+}
+
+// configForSave returns a copy of the config with env overrides reverted to
+// their persisted values, so transient env settings are not written to disk.
+// Fields deliberately changed at runtime since the override was applied are
+// kept (see fieldOverride.revert).
+func (m *Manager) configForSave() Config {
+	c := *m.config
+	c.DefaultProvider = m.overrides.defaultProvider.revert(c.DefaultProvider)
+	c.OutputFormat = m.overrides.outputFormat.revert(c.OutputFormat)
+	c.ColorEnabled = m.overrides.colorEnabled.revert(c.ColorEnabled)
+	c.NoBanner = m.overrides.noBanner.revert(c.NoBanner)
+	return c
+}
+
+// writeAtomic writes data to the config file atomically: it writes to a temp
+// file in the same directory, syncs, then renames over the target. A crash
+// mid-write leaves the existing config intact.
+func (m *Manager) writeAtomic(data []byte) error {
+	tmp, err := os.CreateTemp(m.configDir, ".config-*.yaml.tmp")
+	if err != nil {
+		return fmt.Errorf("failed to create temp config file: %w", err)
+	}
+	tmpPath := tmp.Name()
+	defer func() { _ = os.Remove(tmpPath) }() // no-op after a successful rename
+
+	if err := tmp.Chmod(0600); err != nil {
+		_ = tmp.Close()
+		return fmt.Errorf("failed to set temp config permissions: %w", err)
+	}
+	if _, err := tmp.Write(data); err != nil {
+		_ = tmp.Close()
+		return fmt.Errorf("failed to write config file: %w", err)
+	}
+	if err := tmp.Sync(); err != nil {
+		_ = tmp.Close()
+		return fmt.Errorf("failed to sync config file: %w", err)
+	}
+	if err := tmp.Close(); err != nil {
+		return fmt.Errorf("failed to close config file: %w", err)
+	}
+	if err := os.Rename(tmpPath, m.configFile); err != nil {
+		return fmt.Errorf("failed to replace config file: %w", err)
+	}
+	return nil
 }
 
 // getConfigDir returns the XDG-compliant config directory

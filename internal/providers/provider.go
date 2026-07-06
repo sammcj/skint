@@ -259,7 +259,7 @@ func FromConfig(cp *config.Provider) (Provider, error) {
 		providerType:  cp.Type,
 		baseURL:       cp.BaseURL,
 		apiKey:        cp.GetAPIKey(),
-		model:         cp.DefaultModel,
+		model:         cp.EffectiveModel(),
 		modelMappings: cp.ModelMappings,
 		needsAPIKey:   cp.NeedsAPIKey(),
 		keyEnvVar:     cp.KeyEnvVar,
@@ -269,10 +269,6 @@ func FromConfig(cp *config.Provider) (Provider, error) {
 	case config.ProviderTypeBuiltin:
 		return &BuiltinProvider{baseProvider: bp}, nil
 	case config.ProviderTypeOpenRouter:
-		// OpenRouter uses Model field; only override if set
-		if cp.Model != "" {
-			bp.model = cp.Model
-		}
 		return &OpenRouterProvider{baseProvider: bp}, nil
 	case config.ProviderTypeLocal:
 		return &LocalProvider{
@@ -280,10 +276,6 @@ func FromConfig(cp *config.Provider) (Provider, error) {
 			authToken:    cp.AuthToken,
 		}, nil
 	case config.ProviderTypeCustom:
-		// For custom providers, use Model field if DefaultModel is empty
-		if bp.model == "" && cp.Model != "" {
-			bp.model = cp.Model
-		}
 		return &CustomProvider{
 			baseProvider: bp,
 			apiType:      cp.APIType,

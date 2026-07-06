@@ -689,4 +689,7 @@ func (m *Model) resetCustomProviderForm() {
 	m.apiKeyInput = ""
 	m.inputFocus = 0
 	m.inputError = ""
+	// Clear any provider selected from an earlier flow so the success screen
+	// resolves the custom provider just configured, not a stale selection.
+	m.selectedProvider = nil
 }

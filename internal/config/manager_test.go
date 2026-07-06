@@ -248,6 +248,174 @@ func TestManagerSaveAndRoundTrip(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
+// Env overrides must not be persisted, and atomic Save
+// ---------------------------------------------------------------------------
+
+func TestSaveDoesNotPersistEnvOverrides(t *testing.T) {
+	t.Setenv("SKINT_DEFAULT_PROVIDER", "native")
+	t.Setenv("SKINT_NO_BANNER", "1")
+	t.Setenv("NO_COLOR", "1")
+
+	dir := t.TempDir()
+	cfgPath := filepath.Join(dir, "config.yaml")
+	yamlContent := `version: "1.0"
+default_provider: "file-provider"
+output_format: "human"
+color_enabled: true
+no_banner: false
+providers:
+  - name: file-provider
+    type: builtin
+    base_url: "https://example.com"
+`
+	if err := os.WriteFile(cfgPath, []byte(yamlContent), 0600); err != nil {
+		t.Fatalf("WriteFile: %v", err)
+	}
+
+	m, err := NewManagerWithPath(cfgPath)
+	if err != nil {
+		t.Fatalf("NewManagerWithPath: %v", err)
+	}
+	if err := m.Load(); err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+
+	// Runtime view reflects the overrides.
+	if got := m.Get().DefaultProvider; got != "native" {
+		t.Errorf("runtime DefaultProvider: got %q, want %q", got, "native")
+	}
+	if !m.Get().NoBanner {
+		t.Error("runtime NoBanner: expected true from env override")
+	}
+	if m.Get().ColorEnabled {
+		t.Error("runtime ColorEnabled: expected false from env override")
+	}
+
+	if err := m.Save(); err != nil {
+		t.Fatalf("Save: %v", err)
+	}
+
+	// Reload with the env vars cleared to inspect what was persisted.
+	os.Unsetenv("SKINT_DEFAULT_PROVIDER")
+	os.Unsetenv("SKINT_NO_BANNER")
+	os.Unsetenv("NO_COLOR")
+
+	m2, err := NewManagerWithPath(cfgPath)
+	if err != nil {
+		t.Fatalf("NewManagerWithPath (reload): %v", err)
+	}
+	if err := m2.Load(); err != nil {
+		t.Fatalf("Load (reload): %v", err)
+	}
+	persisted := m2.Get()
+	if persisted.DefaultProvider != "file-provider" {
+		t.Errorf("persisted DefaultProvider: got %q, want %q", persisted.DefaultProvider, "file-provider")
+	}
+	if persisted.NoBanner {
+		t.Error("persisted NoBanner: expected false (env override should not persist)")
+	}
+	if !persisted.ColorEnabled {
+		t.Error("persisted ColorEnabled: expected true (env override should not persist)")
+	}
+}
+
+func TestSavePersistsDeliberateChangeOverEnvOverride(t *testing.T) {
+	t.Setenv("SKINT_DEFAULT_PROVIDER", "native")
+
+	dir := t.TempDir()
+	cfgPath := filepath.Join(dir, "config.yaml")
+	yamlContent := `version: "1.0"
+default_provider: "provider-a"
+output_format: "human"
+providers:
+  - name: provider-a
+    type: builtin
+    base_url: "https://a.example.com"
+  - name: provider-b
+    type: builtin
+    base_url: "https://b.example.com"
+`
+	if err := os.WriteFile(cfgPath, []byte(yamlContent), 0600); err != nil {
+		t.Fatalf("WriteFile: %v", err)
+	}
+
+	m, err := NewManagerWithPath(cfgPath)
+	if err != nil {
+		t.Fatalf("NewManagerWithPath: %v", err)
+	}
+	if err := m.Load(); err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+
+	// User deliberately changes the default at runtime (e.g. TUI selection).
+	m.Get().DefaultProvider = "provider-b"
+	if err := m.Save(); err != nil {
+		t.Fatalf("Save: %v", err)
+	}
+
+	os.Unsetenv("SKINT_DEFAULT_PROVIDER")
+	m2, err := NewManagerWithPath(cfgPath)
+	if err != nil {
+		t.Fatalf("NewManagerWithPath (reload): %v", err)
+	}
+	if err := m2.Load(); err != nil {
+		t.Fatalf("Load (reload): %v", err)
+	}
+	if got := m2.Get().DefaultProvider; got != "provider-b" {
+		t.Errorf("persisted DefaultProvider: got %q, want %q (deliberate change must win over env override revert)", got, "provider-b")
+	}
+}
+
+func TestLoadNonexistentDefaultProviderOverride(t *testing.T) {
+	t.Setenv("SKINT_DEFAULT_PROVIDER", "does-not-exist")
+
+	dir := t.TempDir()
+	cfgPath := filepath.Join(dir, "config.yaml")
+	yamlContent := `version: "1.0"
+default_provider: "file-provider"
+output_format: "human"
+providers:
+  - name: file-provider
+    type: builtin
+    base_url: "https://example.com"
+`
+	if err := os.WriteFile(cfgPath, []byte(yamlContent), 0600); err != nil {
+		t.Fatalf("WriteFile: %v", err)
+	}
+
+	m, err := NewManagerWithPath(cfgPath)
+	if err != nil {
+		t.Fatalf("NewManagerWithPath: %v", err)
+	}
+	// Load must succeed despite the override naming an unknown provider.
+	if err := m.Load(); err != nil {
+		t.Fatalf("Load: expected success with fallback, got %v", err)
+	}
+	if got := m.Get().DefaultProvider; got != "file-provider" {
+		t.Errorf("DefaultProvider: got %q, want fallback %q", got, "file-provider")
+	}
+}
+
+func TestSaveLeavesNoTempFiles(t *testing.T) {
+	dir := t.TempDir()
+	cfgPath := filepath.Join(dir, "config.yaml")
+	m, err := NewManagerWithPath(cfgPath)
+	if err != nil {
+		t.Fatalf("NewManagerWithPath: %v", err)
+	}
+	if err := m.Save(); err != nil {
+		t.Fatalf("Save: %v", err)
+	}
+	matches, err := filepath.Glob(filepath.Join(dir, ".config-*.tmp"))
+	if err != nil {
+		t.Fatalf("Glob: %v", err)
+	}
+	if len(matches) != 0 {
+		t.Errorf("leftover temp files after Save: %v", matches)
+	}
+}
+
+// ---------------------------------------------------------------------------
 // Manager accessors: Exists, ConfigFile, ConfigDir
 // ---------------------------------------------------------------------------
 

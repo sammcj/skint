@@ -130,20 +130,22 @@ func (m *Model) triggerModelFetch() tea.Cmd {
 	m.fetchedModels = nil
 	m.modelPickerOpen = false
 	m.modelPickerIdx = 0
-	return fetchModelsCmd(baseURL, apiKey, providerName)
+	m.fetchGeneration++
+	return fetchModelsCmd(baseURL, apiKey, providerName, m.fetchGeneration)
 }
 
 // modelsFetchedMsg is sent when an async model fetch completes.
 type modelsFetchedMsg struct {
-	models []models.ModelInfo
-	err    error
+	models     []models.ModelInfo
+	err        error
+	generation int
 }
 
 // fetchModelsCmd returns a Bubble Tea command that fetches models asynchronously.
-func fetchModelsCmd(baseURL, apiKey, providerName string) tea.Cmd {
+func fetchModelsCmd(baseURL, apiKey, providerName string, generation int) tea.Cmd {
 	return func() tea.Msg {
 		result := models.FetchModels(baseURL, apiKey, providerName)
-		return modelsFetchedMsg{models: result.Models, err: result.Err}
+		return modelsFetchedMsg{models: result.Models, err: result.Err, generation: generation}
 	}
 }
 
@@ -167,13 +169,15 @@ func (m *Model) filteredModels() []models.ModelInfo {
 	return filtered
 }
 
-// resetModelPicker clears all model picker state.
+// resetModelPicker clears all model picker state. Bumping the fetch generation
+// invalidates any in-flight fetch so its result is discarded on arrival.
 func (m *Model) resetModelPicker() {
 	m.fetchedModels = nil
 	m.modelPickerOpen = false
 	m.modelPickerIdx = 0
 	m.modelFetching = false
 	m.modelFetchErr = ""
+	m.fetchGeneration++
 }
 
 // resolveProviderForFetch determines the base URL, API key, and provider name

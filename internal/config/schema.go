@@ -189,13 +189,14 @@ func (p *Provider) GetAPIKey() string {
 	return p.resolvedAPIKey
 }
 
-// EffectiveModel returns the model to use: DefaultModel for builtin providers,
-// Model for OpenRouter/custom providers, whichever is set.
+// EffectiveModel returns the model to use. A user-selected Model always takes
+// precedence over the provider's registry DefaultModel; returns empty if neither
+// is set.
 func (p *Provider) EffectiveModel() string {
-	if p.DefaultModel != "" {
-		return p.DefaultModel
+	if p.Model != "" {
+		return p.Model
 	}
-	return p.Model
+	return p.DefaultModel
 }
 
 // NeedsAPIKey returns true if this provider requires an API key.

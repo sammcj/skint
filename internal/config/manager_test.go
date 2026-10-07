@@ -13,6 +13,9 @@ import (
 
 func TestManagerLoad(t *testing.T) {
 	t.Run("no file returns defaults", func(t *testing.T) {
+		t.Setenv("NO_COLOR", "")
+		t.Setenv("SKINT_NO_COLOR", "")
+		t.Setenv("SKINT_OUTPUT_FORMAT", "")
 		dir := t.TempDir()
 		m, err := NewManagerWithPath(filepath.Join(dir, "config.yaml"))
 		if err != nil {
@@ -30,6 +33,28 @@ func TestManagerLoad(t *testing.T) {
 		}
 		if !cfg.ColorEnabled {
 			t.Error("ColorEnabled: expected true")
+		}
+	})
+
+	// A sandbox with no config.yaml must still honour SKINT_FORCE_FILE_STORE,
+	// otherwise secrets initialisation probes the OS keyring.
+	t.Run("no file still applies env overrides", func(t *testing.T) {
+		t.Setenv("SKINT_FORCE_FILE_STORE", "1")
+		t.Setenv("SKINT_OUTPUT_FORMAT", FormatJSON)
+		dir := t.TempDir()
+		m, err := NewManagerWithPath(filepath.Join(dir, "config.yaml"))
+		if err != nil {
+			t.Fatalf("NewManagerWithPath: %v", err)
+		}
+		if err := m.Load(); err != nil {
+			t.Fatalf("Load: %v", err)
+		}
+		cfg := m.Get()
+		if !cfg.ForceFileStore {
+			t.Error("ForceFileStore: expected true from SKINT_FORCE_FILE_STORE")
+		}
+		if cfg.OutputFormat != FormatJSON {
+			t.Errorf("OutputFormat: got %q, want %q", cfg.OutputFormat, FormatJSON)
 		}
 	})
 

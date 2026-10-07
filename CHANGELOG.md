@@ -26,6 +26,7 @@
 
 - `force_file_store` config option and `SKINT_FORCE_FILE_STORE` env var (`1`/`0`, `true`/`false`; invalid values are ignored with a warning) to bypass OS keyring and use the AES-256-GCM encrypted file store -- useful for sandboxed environments where keyring access is undesirable
 - With `force_file_store` enabled, `keyring:` key references return an error asking you to re-enter the key instead of calling the OS keyring
+- `SKINT_*` env overrides (including `SKINT_FORCE_FILE_STORE`) now apply when `config.yaml` does not exist
 
 ## 2026-03-04 12:00
 

@@ -83,7 +83,10 @@ func (m *Manager) Load() error {
 
 	// Check if file exists
 	if _, err := os.Stat(m.configFile); os.IsNotExist(err) {
-		// No config file yet, use defaults
+		// No config file yet, use defaults. Env overrides still apply so
+		// SKINT_FORCE_FILE_STORE keeps a config-less sandbox off the keyring.
+		m.applyEnvOverrides()
+		m.resolveDefaultProviderOverride()
 		return nil
 	}
 
